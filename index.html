@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>영생고 생태지도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ───── Design Tokens ───── */
+:root {
+  --bg: #F4F7F2;
+  --surf: #ffffff;
+  --surf2: #EDF2EB;
+  --pri: #3B7A4A;
+  --pri-d: #2E6039;
+  --pri-m: #7CAE87;
+  --acc: #E09020;
+  --txt: #1A2B18;
+  --txt2: #4A6442;
+  --bdr: #D0DBC9;
+  --danger: #C0392B;
+  --shadow: 0 2px 12px rgba(0,0,0,.10);
+  --r: 12px;
+  --nav-h: 62px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111A10; --surf: #1C2A1B; --surf2: #243223;
+    --pri: #5FA870; --pri-d: #4A8A59; --pri-m: #3B7A4A;
+    --acc: #F0A830; --txt: #E8F0E5; --txt2: #9DBF9E;
+    --bdr: #2E402D; --danger: #E05040;
+    --shadow: 0 2px 16px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111A10; --surf: #1C2A1B; --surf2: #243223;
+  --pri: #5FA870; --pri-d: #4A8A59; --pri-m: #3B7A4A;
+  --acc: #F0A830; --txt: #E8F0E5; --txt2: #9DBF9E;
+  --bdr: #2E402D; --danger: #E05040;
+  --shadow: 0 2px 16px rgba(0,0,0,.35);
+}
+
+/* ───── Reset & Base ───── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--txt); overflow: hidden; }
+button { cursor: pointer; font-family: inherit; border: none; outline: none; }
+input, select, textarea { font-family: inherit; }
+img { max-width: 100%; }
+
+/* ───── Setup Screen ───── */
+#setup {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-start; overflow-y: auto; padding: 24px 20px 40px;
+  z-index: 9999;
+}
+.setup-card {
+  background: var(--surf); border-radius: 16px; padding: 28px 24px;
+  max-width: 560px; width: 100%; box-shadow: var(--shadow);
+}
+.setup-logo { font-size: 40px; text-align: center; margin-bottom: 8px; }
+.setup-title { text-align: center; font-size: 20px; font-weight: 700; color: var(--pri); margin-bottom: 4px; }
+.setup-sub { text-align: center; font-size: 13px; color: var(--txt2); margin-bottom: 24px; }
+.setup-step { display: flex; gap: 12px; margin-bottom: 18px; align-items: flex-start; }
+.step-num {
+  min-width: 28px; height: 28px; border-radius: 50%;
+  background: var(--pri); color: #fff; font-size: 13px;
+  font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.step-body { flex: 1; }
+.step-body strong { font-size: 14px; display: block; margin-bottom: 4px; color: var(--txt); }
+.step-body p { font-size: 13px; color: var(--txt2); line-height: 1.6; }
+.step-body a { color: var(--pri); text-decoration: none; }
+.setup-code {
+  background: var(--surf2); border-radius: 8px; padding: 12px 14px;
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--txt2);
+  white-space: pre; overflow-x: auto; margin: 8px 0; border: 1px solid var(--bdr);
+}
+.setup-warning {
+  background: #FFF8E8; border: 1px solid #F0C040; border-radius: 10px;
+  padding: 12px 14px; font-size: 13px; color: #7A5000; margin-top: 16px;
+}
+
+/* ───── App Shell ───── */
+#app { display: flex; flex-direction: column; height: 100%; }
+.topbar {
+  background: var(--surf); border-bottom: 1px solid var(--bdr);
+  display: flex; align-items: center; padding: 0 16px;
+  height: 52px; gap: 8px; flex-shrink: 0; position: relative;
+}
+.topbar h1 { font-size: 16px; font-weight: 700; color: var(--pri); flex: 1; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 10px; background: transparent;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  color: var(--txt2); transition: background .15s;
+}
+.icon-btn:active { background: var(--surf2); }
+
+/* ───── Tab Content ───── */
+.tab-content { flex: 1; overflow: hidden; position: relative; }
+.tab-pane { position: absolute; inset: 0; overflow-y: auto; display: none; }
+.tab-pane.active { display: block; }
+
+/* ───── Bottom Nav ───── */
+.bottom-nav {
+  background: var(--surf); border-top: 1px solid var(--bdr);
+  display: flex; height: var(--nav-h); flex-shrink: 0;
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; background: transparent;
+  color: var(--txt2); font-size: 10px; font-weight: 500;
+  transition: color .15s; padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.nav-btn .nav-icon { font-size: 22px; line-height: 1; }
+.nav-btn.active { color: var(--pri); }
+
+/* ───── Form Tab ───── */
+.form-wrap { padding: 16px; max-width: 560px; margin: 0 auto; }
+.form-section { margin-bottom: 20px; }
+.form-section label { display: block; font-size: 13px; font-weight: 600; color: var(--txt2); margin-bottom: 6px; }
+.inp, select.inp, textarea.inp {
+  width: 100%; padding: 11px 14px; border-radius: var(--r);
+  border: 1.5px solid var(--bdr); background: var(--surf);
+  font-size: 15px; color: var(--txt); transition: border-color .2s;
+  -webkit-appearance: none; appearance: none;
+}
+.inp:focus { outline: none; border-color: var(--pri); }
+textarea.inp { height: 80px; resize: none; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Photo Upload */
+.photo-area {
+  border: 2px dashed var(--bdr); border-radius: var(--r);
+  background: var(--surf2); min-height: 130px;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px; cursor: pointer;
+  transition: border-color .2s; position: relative; overflow: hidden;
+}
+.photo-area:active { border-color: var(--pri); }
+.photo-area img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+.photo-area .photo-hint { font-size: 13px; color: var(--txt2); text-align: center; z-index: 1; }
+.photo-area .photo-icon { font-size: 32px; z-index: 1; }
+.photo-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,.4);
+  display: flex; align-items: center; justify-content: center; gap: 10px; z-index: 2;
+}
+.photo-overlay button {
+  background: rgba(255,255,255,.9); border-radius: 8px; padding: 8px 12px;
+  font-size: 13px; font-weight: 600;
+}
+
+/* Zone Chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  padding: 6px 14px; border-radius: 99px; font-size: 13px; font-weight: 500;
+  border: 1.5px solid var(--bdr); background: var(--surf2); color: var(--txt);
+  cursor: pointer; transition: all .15s;
+}
+.chip.active { background: var(--pri); border-color: var(--pri); color: #fff; }
+
+/* Map Pin Picker */
+.map-picker-wrap {
+  border-radius: var(--r); overflow: hidden; border: 1.5px solid var(--bdr);
+  background: var(--surf2); position: relative; touch-action: none;
+}
+.map-picker-wrap svg { display: block; width: 100%; height: auto; cursor: crosshair; }
+.map-pin-label {
+  position: absolute; background: var(--pri); color: #fff;
+  font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 99px;
+  pointer-events: none; white-space: nowrap; transform: translate(-50%, -130%);
+  opacity: 0; transition: opacity .2s;
+}
+.map-pin-label.visible { opacity: 1; }
+
+/* Submit Button */
+.submit-btn {
+  width: 100%; padding: 14px; border-radius: var(--r); font-size: 16px;
+  font-weight: 700; background: var(--pri); color: #fff;
+  transition: opacity .15s; margin-top: 8px;
+}
+.submit-btn:active { opacity: .8; }
+.submit-btn:disabled { opacity: .5; }
+
+/* ───── Map Tab ───── */
+.map-wrap { padding: 12px; }
+.map-container { position: relative; border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); }
+.map-container svg { display: block; width: 100%; height: auto; }
+.obs-pin {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2.5px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  overflow: hidden; cursor: pointer; transition: transform .15s;
+}
+.obs-pin:active { transform: translate(-50%,-50%) scale(1.2); }
+.obs-pin img { width: 100%; height: 100%; object-fit: cover; }
+.obs-pin-emoji {
+  position: absolute; transform: translate(-50%, -50%);
+  font-size: 20px; line-height: 1; cursor: pointer;
+  text-shadow: 0 1px 4px rgba(0,0,0,.4);
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.3));
+  transition: transform .15s;
+}
+.obs-pin-emoji:active { transform: translate(-50%,-50%) scale(1.25); }
+
+.map-controls {
+  display: flex; gap: 8px; padding: 0 12px 12px; flex-wrap: wrap; align-items: center;
+}
+.filter-label { font-size: 13px; color: var(--txt2); font-weight: 600; margin-right: 4px; }
+.filter-chip {
+  padding: 5px 12px; border-radius: 99px; font-size: 12px;
+  border: 1.5px solid var(--bdr); background: var(--surf2); color: var(--txt);
+  cursor: pointer; transition: all .15s;
+}
+.filter-chip.active { background: var(--pri); border-color: var(--pri); color: #fff; }
+
+.legend { padding: 0 12px 12px; }
+.legend-title { font-size: 12px; color: var(--txt2); font-weight: 600; margin-bottom: 6px; }
+.legend-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+
+/* ───── Class Tab ───── */
+.class-wrap { padding: 12px; }
+.class-select-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.class-select-row label { font-size: 13px; font-weight: 600; color: var(--txt2); }
+.class-map-container { position: relative; border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 12px; }
+.class-map-container svg { display: block; width: 100%; height: auto; }
+
+.stats-bar {
+  background: var(--surf); border-radius: var(--r); padding: 14px 16px;
+  margin-bottom: 12px; box-shadow: var(--shadow);
+}
+.stats-title { font-size: 13px; font-weight: 700; color: var(--txt2); margin-bottom: 10px; }
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-item { text-align: center; }
+.stat-num { font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500; color: var(--pri); line-height: 1; }
+.stat-label { font-size: 11px; color: var(--txt2); margin-top: 2px; }
+
+.obs-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 80px; }
+.obs-card {
+  background: var(--surf); border-radius: var(--r); padding: 14px;
+  box-shadow: var(--shadow); display: flex; gap: 12px; align-items: flex-start;
+}
+.obs-card-img {
+  width: 60px; height: 60px; border-radius: 10px; object-fit: cover;
+  flex-shrink: 0; background: var(--surf2);
+}
+.obs-card-img-placeholder {
+  width: 60px; height: 60px; border-radius: 10px; flex-shrink: 0;
+  background: var(--surf2); display: flex; align-items: center;
+  justify-content: center; font-size: 24px;
+}
+.obs-card-body { flex: 1; min-width: 0; }
+.obs-card-species { font-size: 15px; font-weight: 700; color: var(--txt); }
+.obs-card-meta { font-size: 12px; color: var(--txt2); margin: 2px 0; }
+.obs-card-notes { font-size: 13px; color: var(--txt); margin-top: 4px; }
+.obs-card-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--txt2); margin-top: 4px; }
+.obs-card-del {
+  background: transparent; color: var(--danger); font-size: 18px;
+  padding: 4px; flex-shrink: 0;
+}
+
+/* ───── Observation Detail Modal ───── */
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  display: flex; align-items: flex-end; justify-content: center;
+  z-index: 1000; padding: 12px;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.modal-bg.open { opacity: 1; pointer-events: auto; }
+.modal {
+  background: var(--surf); border-radius: 20px 20px 16px 16px;
+  width: 100%; max-width: 500px; overflow: hidden;
+  transform: translateY(40px); transition: transform .25s;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-bg.open .modal { transform: translateY(0); }
+.modal-img { width: 100%; height: 220px; object-fit: cover; }
+.modal-body { padding: 20px; }
+.modal-species { font-size: 22px; font-weight: 700; }
+.modal-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.modal-badge {
+  background: var(--surf2); border-radius: 99px; padding: 4px 12px;
+  font-size: 13px; color: var(--txt2);
+}
+.modal-notes { font-size: 14px; line-height: 1.7; margin: 12px 0; color: var(--txt); }
+.modal-time { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--txt2); }
+.modal-close {
+  width: 100%; padding: 13px; background: var(--surf2);
+  color: var(--txt); font-size: 15px; font-weight: 600;
+  border-radius: 0 0 16px 16px;
+}
+
+/* ───── Toast ───── */
+.toast {
+  position: fixed; bottom: calc(var(--nav-h) + 12px); left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #222; color: #fff; border-radius: 10px;
+  padding: 10px 18px; font-size: 14px; font-weight: 500;
+  opacity: 0; transition: all .3s; pointer-events: none; white-space: nowrap;
+  z-index: 2000; max-width: 90vw;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ───── Loading ───── */
+.spinner {
+  width: 36px; height: 36px; border: 3px solid var(--bdr);
+  border-top-color: var(--pri); border-radius: 50%;
+  animation: spin .8s linear infinite; margin: 40px auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty-state {
+  text-align: center; padding: 48px 20px; color: var(--txt2);
+}
+.empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+/* ───── Colors per class ───── */
+.cls-color-0  { background: #E53935; }
+.cls-color-1  { background: #D81B60; }
+.cls-color-2  { background: #8E24AA; }
+.cls-color-3  { background: #3949AB; }
+.cls-color-4  { background: #1E88E5; }
+.cls-color-5  { background: #039BE5; }
+.cls-color-6  { background: #00897B; }
+.cls-color-7  { background: #43A047; }
+.cls-color-8  { background: #7CB342; }
+.cls-color-9  { background: #F4511E; }
+.cls-color-10 { background: #6D4C41; }
+.cls-color-11 { background: #757575; }
+.cls-color-12 { background: #546E7A; }
+.cls-color-13 { background: #C0CA33; }
+.cls-color-14 { background: #FFB300; }
+.cls-color-15 { background: #FB8C00; }
+.cls-color-16 { background: #6D4C41; }
+.cls-color-17 { background: #EC407A; }
+.cls-color-18 { background: #AB47BC; }
+.cls-color-19 { background: #26C6DA; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════ SETUP SCREEN ══════════════════════ -->
+<div id="setup" style="display:none;">
+  <div class="setup-card">
+    <div class="setup-logo">🌿</div>
+    <div class="setup-title">영생고 생태지도 — Firebase 설정 필요</div>
+    <div class="setup-sub">아래 안내를 따라 Firebase를 연결하면 학생들이 바로 사용할 수 있어요!</div>
+
+    <div class="setup-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Firebase 프로젝트 만들기</strong>
+        <p><a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> 접속 → <b>프로젝트 만들기</b> → 이름 입력 (예: <code>yeongsaeng-ecology</code>) → Google 애널리틱스 비활성화 → 만들기</p>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Realtime Database 활성화</strong>
+        <p>왼쪽 메뉴 → <b>빌드 → Realtime Database</b> → 데이터베이스 만들기 → 지역: <b>asia-southeast1</b> → 보안 규칙: <b>테스트 모드로 시작</b> → 사용 설정</p>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>웹 앱 구성 값 복사하기</strong>
+        <p>프로젝트 개요 → 웹 아이콘 <code>&lt;/&gt;</code> 클릭 → 앱 닉네임 입력 → 등록 → <b>firebaseConfig</b> 내용 복사</p>
+        <div class="setup-code">const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "your-project.firebaseapp.com",
+  databaseURL: "https://your-project-rtdb.asia-southeast1...",
+  projectId: "your-project",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc123"
+};</div>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <strong>index.html 파일에 붙여넣기</strong>
+        <p>메모장 또는 VS Code로 <code>index.html</code> 열기 → 파일 상단에서 <code>FB_CONFIG</code>를 찾아 복사한 값으로 교체</p>
+        <div class="setup-code">// ← 이 부분을 찾아서 교체하세요
+const FB_CONFIG = {
+  apiKey: "여기에 복사한 값",
+  ...
+};</div>
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <strong>GitHub Pages에 업로드</strong>
+        <p>GitHub → 새 저장소 → 이름: <code>ecology-map</code> → <b>index.html</b> 업로드 → Settings → Pages → Branch: <b>main</b> → Save → URL 학생들에게 공유!</p>
+      </div>
+    </div>
+
+    <div class="setup-warning">
+      ⚠️ <b>Firebase 무료 티어 보안 주의:</b> 테스트 모드는 30일 후 자동 만료됩니다. 이후 Realtime Database → 규칙 탭에서 아래 규칙을 붙여넣어 읽기/쓰기를 유지하세요:<br><br>
+      <code>{ "rules": { ".read": true, ".write": true } }</code>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ MAIN APP ══════════════════════ -->
+<div id="app" style="display:none;">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <h1>🌿 영생고 생태지도</h1>
+    <button class="icon-btn" id="themeBtn" title="다크모드 전환">🌙</button>
+    <button class="icon-btn" id="refreshBtn" title="새로고침">🔄</button>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="tab-content">
+
+    <!-- ── Tab 1: 기록하기 ── -->
+    <div class="tab-pane active" id="tab-record">
+      <div class="form-wrap">
+
+        <!-- 학급 / 모둠 -->
+        <div class="form-section">
+          <label>학급 & 모둠</label>
+          <div class="row2">
+            <select class="inp" id="selClass">
+              <option value="">학년·반 선택</option>
+            </select>
+            <select class="inp" id="selGroup">
+              <option value="">모둠 선택</option>
+              <option>1모둠</option><option>2모둠</option><option>3모둠</option>
+              <option>4모둠</option><option>5모둠</option><option>6모둠</option>
+              <option>개인</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 생물 이름 -->
+        <div class="form-section">
+          <label>생물 이름 <span style="font-weight:400;color:var(--txt2)">(구글 렌즈로 동정 후 입력)</span></label>
+          <input class="inp" id="inpSpecies" type="text" placeholder="예) 참새, 민들레, 배추흰나비…" autocomplete="off">
+        </div>
+
+        <!-- 발견 장소 — Chip -->
+        <div class="form-section">
+          <label>발견 장소</label>
+          <div class="chips" id="zoneChips"></div>
+        </div>
+
+        <!-- 발견 장소 — Map Pin -->
+        <div class="form-section">
+          <label>지도에서 정확한 위치 표시 <span style="font-weight:400;color:var(--txt2)">(탭하여 핀 이동)</span></label>
+          <div class="map-picker-wrap" id="mapPicker">
+            <!-- SVG injected by JS -->
+            <div class="map-pin-label" id="mapPinLabel"></div>
+          </div>
+        </div>
+
+        <!-- 사진 -->
+        <div class="form-section">
+          <label>사진</label>
+          <div class="photo-area" id="photoArea" onclick="document.getElementById('photoInput').click()">
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">탭하여 사진 촬영 또는 선택</div>
+          </div>
+          <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+        </div>
+
+        <!-- 메모 -->
+        <div class="form-section">
+          <label>메모 <span style="font-weight:400;color:var(--txt2)">(선택)</span></label>
+          <textarea class="inp" id="inpNotes" placeholder="발견 상황, 특이사항 등"></textarea>
+        </div>
+
+        <button class="submit-btn" id="submitBtn">📍 기록 저장하기</button>
+        <div style="height:20px;"></div>
+      </div>
+    </div>
+
+    <!-- ── Tab 2: 생태지도 ── -->
+    <div class="tab-pane" id="tab-map">
+      <div class="map-controls">
+        <span class="filter-label">학급:</span>
+        <button class="filter-chip active" data-filter="all">전체</button>
+        <div id="classFilterChips" style="display:contents;"></div>
+      </div>
+      <div class="map-wrap">
+        <div class="map-container" id="mainMapContainer">
+          <!-- SVG + pins injected by JS -->
+        </div>
+      </div>
+      <div class="legend" id="mapLegend"></div>
+    </div>
+
+    <!-- ── Tab 3: 학급별 ── -->
+    <div class="tab-pane" id="tab-class">
+      <div class="class-wrap">
+        <div class="class-select-row">
+          <label>학급 선택:</label>
+          <select class="inp" id="classViewSel" style="max-width:180px;"></select>
+        </div>
+        <div class="class-map-container" id="classMapContainer">
+          <!-- SVG + pins injected by JS -->
+        </div>
+        <div class="stats-bar" id="statsBar"></div>
+        <div class="obs-list" id="obsList"></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="tab-record">
+      <span class="nav-icon">📝</span>기록하기
+    </button>
+    <button class="nav-btn" data-tab="tab-map">
+      <span class="nav-icon">🗺️</span>생태지도
+    </button>
+    <button class="nav-btn" data-tab="tab-class">
+      <span class="nav-icon">📊</span>학급별
+    </button>
+  </nav>
+</div><!-- /app -->
+
+<!-- Modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modal">
+    <div id="modalContent"></div>
+    <button class="modal-close" id="modalClose">닫기</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════
+   🔧 FIREBASE 설정 — 여기를 교체하세요
+   ══════════════════════════════════════════════ */
+const FB_CONFIG = {
+  apiKey:            "AIzaSyBSTeg09a4Yi6H93QI37GLR5ojTKPOvXVI",
+  authDomain:        "yeongsaeng-ecology.firebaseapp.com",
+  databaseURL:       "https://yeongsaeng-ecology-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "yeongsaeng-ecology",
+  storageBucket:     "yeongsaeng-ecology.firebasestorage.app",
+  messagingSenderId: "890745613713",
+  appId:             "1:890745613713:web:992ef138200e8849457e30"
+};
+/* ══════════════════════════════════════════════ */
+
+/* ──── Constants ──── */
+const GRADES = [1, 2, 3];
+const CLASSES_PER_GRADE = 20; // 최대 20반
+
+const ZONES = [
+  { id: '정문',         em: '🚪', x: .470, y: .965 },
+  { id: '본관',         em: '🏫', x: .190, y: .470 },
+  { id: '급식동',       em: '🍽️', x: .240, y: .145 },
+  { id: '대강당',       em: '🎭', x: .660, y: .185 },
+  { id: '100주년기념관', em: '🏛️', x: .920, y: .470 },
+  { id: '운동장',       em: '⚽', x: .630, y: .775 },
+  { id: '농구코트',     em: '🏀', x: .210, y: .730 },
+  { id: '트랙',         em: '🏃', x: .370, y: .750 },
+];
+
+/* Class color palette (CSS class indices) */
+const CLS_COLORS = [
+  '#E53935','#D81B60','#8E24AA','#3949AB','#1E88E5',
+  '#039BE5','#00897B','#43A047','#7CB342','#F4511E',
+  '#6D4C41','#757575','#546E7A','#C0CA33','#FFB300',
+  '#FB8C00','#6D4C41','#EC407A','#AB47BC','#26C6DA',
+];
+
+/* ──── State ──── */
+let observations = {};
+let obsRef = null;
+let selectedZone = null;
+let pinX = null, pinY = null;
+let photoData = null;
+let activeFilter = 'all';
+let currentClassView = '';
+let themeMode = localStorage.getItem('theme') || 'auto';
+
+/* ──── Boot ──── */
+window.addEventListener('DOMContentLoaded', () => {
+  if (FB_CONFIG.apiKey === 'YOUR_API_KEY') {
+    document.getElementById('setup').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    return;
+  }
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  initApp();
+});
+
+function initApp() {
+  applyTheme();
+  buildClassSelect();
+  buildZoneChips();
+  injectMapSVG('mapPicker', true);
+  injectMapSVG('mainMapContainer', false);
+  injectMapSVG('classMapContainer', false);
+  initFirebase();
+  bindUI();
+}
+
+/* ──── Firebase ──── */
+function initFirebase() {
+  try {
+    firebase.initializeApp(FB_CONFIG);
+    obsRef = firebase.database().ref('observations');
+    obsRef.on('value', snap => {
+      observations = snap.val() || {};
+      onData();
+    }, err => {
+      toast('❌ DB 연결 오류: ' + err.message);
+    });
+  } catch(e) {
+    toast('❌ Firebase 초기화 오류: ' + e.message);
+  }
+}
+
+function onData() {
+  renderMapPins();
+  renderClassView();
+}
+
+/* ──── School SVG Map ──── */
+function buildSchoolSVG() {
+  return `<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" style="background:#e8eed4;">
+  <defs>
+    <pattern id="grass" patternUnits="userSpaceOnUse" width="8" height="8">
+      <rect width="8" height="8" fill="#c8dba0"/>
+      <line x1="0" y1="4" x2="8" y2="4" stroke="#b8cb90" stroke-width=".4"/>
+    </pattern>
+    <pattern id="track-lines" patternUnits="userSpaceOnUse" width="4" height="4">
+      <rect width="4" height="4" fill="#c8b870"/>
+      <line x1="0" y1="2" x2="4" y2="2" stroke="#b8a860" stroke-width=".5"/>
+    </pattern>
+    <filter id="bshadow" x="-5%" y="-5%" width="115%" height="120%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity=".18"/>
+    </filter>
+  </defs>
+
+  <!-- Ground -->
+  <rect width="400" height="300" fill="#d4dbb8"/>
+
+  <!-- Paths / road -->
+  <rect x="135" y="0" width="60" height="300" fill="#bec8a8" opacity=".6"/>
+  <rect x="0" y="70" width="400" height="8" fill="#bec8a8" opacity=".5"/>
+  <rect x="0" y="175" width="400" height="6" fill="#bec8a8" opacity=".5"/>
+  <line x1="165" y1="0" x2="165" y2="300" stroke="#aab898" stroke-width=".8" stroke-dasharray="6,4"/>
+
+  <!-- 급식동 (cafeteria) — upper left -->
+  <rect x="38" y="15" width="112" height="54" rx="4" fill="#8B9E6B" filter="url(#bshadow)"/>
+  <rect x="38" y="15" width="112" height="8" rx="4" fill="#768A58"/>
+  <text x="94" y="46" text-anchor="middle" font-size="9" fill="#fff" font-family="sans-serif" font-weight="600">급식동</text>
+  <text x="94" y="58" text-anchor="middle" font-size="14">🍽️</text>
+
+  <!-- 본관 (main building) — left, tall -->
+  <rect x="28" y="82" width="92" height="118" rx="4" fill="#7A8E60" filter="url(#bshadow)"/>
+  <rect x="28" y="82" width="92" height="10" rx="4" fill="#667A4E"/>
+  <!-- windows -->
+  <rect x="38" y="96" width="16" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="60" y="96" width="16" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="82" y="96" width="24" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="38" y="112" width="16" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="60" y="112" width="16" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="82" y="112" width="24" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="38" y="128" width="16" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="60" y="128" width="16" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="82" y="128" width="24" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="38" y="148" width="16" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="60" y="148" width="16" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <rect x="82" y="148" width="24" height="10" rx="2" fill="#9EC8C0" opacity=".8"/>
+  <!-- door -->
+  <rect x="63" y="178" width="18" height="22" rx="3" fill="#4A5C34"/>
+  <text x="74" y="137" text-anchor="middle" font-size="9" fill="#fff" font-family="sans-serif" font-weight="600">본관</text>
+  <text x="74" y="149" text-anchor="middle" font-size="14">🏫</text>
+
+  <!-- 대강당 (auditorium) — upper right -->
+  <rect x="196" y="12" width="136" height="80" rx="4" fill="#8B7E5A" filter="url(#bshadow)"/>
+  <rect x="196" y="12" width="136" height="9" rx="4" fill="#766A48"/>
+  <rect x="206" y="27" width="20" height="12" rx="2" fill="#C4B08A" opacity=".7"/>
+  <rect x="234" y="27" width="20" height="12" rx="2" fill="#C4B08A" opacity=".7"/>
+  <rect x="262" y="27" width="20" height="12" rx="2" fill="#C4B08A" opacity=".7"/>
+  <rect x="290" y="27" width="24" height="12" rx="2" fill="#C4B08A" opacity=".7"/>
+  <text x="264" y="60" text-anchor="middle" font-size="9" fill="#fff" font-family="sans-serif" font-weight="600">대강당</text>
+  <text x="264" y="75" text-anchor="middle" font-size="14">🎭</text>
+
+  <!-- 100주년기념관 — right side -->
+  <rect x="345" y="98" width="48" height="84" rx="4" fill="#7E6E8B" filter="url(#bshadow)"/>
+  <rect x="345" y="98" width="48" height="8" rx="4" fill="#6A5C76"/>
+  <rect x="352" y="112" width="12" height="8" rx="2" fill="#C0A8D0" opacity=".7"/>
+  <rect x="370" y="112" width="12" height="8" rx="2" fill="#C0A8D0" opacity=".7"/>
+  <rect x="352" y="126" width="12" height="8" rx="2" fill="#C0A8D0" opacity=".7"/>
+  <rect x="370" y="126" width="12" height="8" rx="2" fill="#C0A8D0" opacity=".7"/>
+  <text x="369" y="150" text-anchor="middle" font-size="7.5" fill="#fff" font-family="sans-serif" font-weight="600">100주년</text>
+  <text x="369" y="160" text-anchor="middle" font-size="7.5" fill="#fff" font-family="sans-serif" font-weight="600">기념관</text>
+  <text x="369" y="175" text-anchor="middle" font-size="13">🏛️</text>
+
+  <!-- 농구코트 (basketball courts) -->
+  <rect x="42" y="183" width="40" height="66" rx="2" fill="#c8a870" stroke="#a88850" stroke-width="1"/>
+  <rect x="88" y="183" width="40" height="66" rx="2" fill="#c8a870" stroke="#a88850" stroke-width="1"/>
+  <rect x="42" y="255" width="40" height="38" rx="2" fill="#c8a870" stroke="#a88850" stroke-width="1"/>
+  <rect x="88" y="255" width="40" height="38" rx="2" fill="#c8a870" stroke="#a88850" stroke-width="1"/>
+  <!-- court lines -->
+  <line x1="62" y1="183" x2="62" y2="249" stroke="#b89860" stroke-width=".8"/>
+  <line x1="108" y1="183" x2="108" y2="249" stroke="#b89860" stroke-width=".8"/>
+  <circle cx="62" cy="216" r="10" fill="none" stroke="#b89860" stroke-width=".8"/>
+  <circle cx="108" cy="216" r="10" fill="none" stroke="#b89860" stroke-width=".8"/>
+  <text x="72" y="220" text-anchor="middle" font-size="8" fill="#8A6840" font-family="sans-serif">농구코트</text>
+  <text x="72" y="230" text-anchor="middle" font-size="12">🏀</text>
+
+  <!-- 트랙 -->
+  <rect x="134" y="178" width="22" height="115" rx="2" fill="url(#track-lines)" stroke="#a89850" stroke-width="1"/>
+  <line x1="139" y1="178" x2="139" y2="293" stroke="#c8a840" stroke-width=".5" stroke-dasharray="4,3"/>
+  <line x1="145" y1="178" x2="145" y2="293" stroke="#c8a840" stroke-width=".5" stroke-dasharray="4,3"/>
+  <line x1="151" y1="178" x2="151" y2="293" stroke="#c8a840" stroke-width=".5" stroke-dasharray="4,3"/>
+  <text x="145" y="240" text-anchor="middle" font-size="7" fill="#7A6830" font-family="sans-serif">트랙</text>
+
+  <!-- 운동장 (field) -->
+  <rect x="160" y="178" width="178" height="115" rx="3" fill="url(#grass)"/>
+  <rect x="160" y="178" width="178" height="115" rx="3" fill="none" stroke="#a8c080" stroke-width="1"/>
+  <!-- center circle -->
+  <circle cx="249" cy="235" r="22" fill="none" stroke="#a8c880" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="249" y1="178" x2="249" y2="293" stroke="#a8c880" stroke-width=".8" stroke-dasharray="4,3"/>
+  <!-- goal areas -->
+  <rect x="160" y="215" width="12" height="40" fill="none" stroke="#a8c880" stroke-width=".8"/>
+  <rect x="326" y="215" width="12" height="40" fill="none" stroke="#a8c880" stroke-width=".8"/>
+  <text x="249" y="233" text-anchor="middle" font-size="9" fill="#607840" font-family="sans-serif" font-weight="600">운동장</text>
+  <text x="249" y="245" text-anchor="middle" font-size="14">⚽</text>
+
+  <!-- 정문 (main gate) — bottom center -->
+  <rect x="155" y="286" width="70" height="14" rx="3" fill="#C8A030" stroke="#A88020" stroke-width="1"/>
+  <text x="190" y="296" text-anchor="middle" font-size="9" fill="#fff" font-family="sans-serif" font-weight="700">정문 🚪</text>
+
+  <!-- Compass -->
+  <g transform="translate(378,18)">
+    <circle r="10" fill="rgba(255,255,255,.7)" stroke="#888" stroke-width=".8"/>
+    <text x="0" y="-3" text-anchor="middle" font-size="7" fill="#C03030" font-weight="700">N</text>
+    <polygon points="0,-8 2.5,0 -2.5,0" fill="#C03030"/>
+    <polygon points="0,8 2.5,0 -2.5,0" fill="#888"/>
+  </g>
+
+  <!-- Scale bar -->
+  <g transform="translate(20,288)">
+    <rect x="0" y="0" width="60" height="4" fill="none" stroke="#666" stroke-width=".8"/>
+    <rect x="0" y="0" width="30" height="4" fill="#666" opacity=".6"/>
+    <text x="30" y="-2" text-anchor="middle" font-size="7" fill="#444">~50m</text>
+  </g>
+</svg>`;
+}
+
+function injectMapSVG(containerId, isPicker) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const svgWrapper = document.createElement('div');
+  svgWrapper.style.position = 'relative';
+  svgWrapper.innerHTML = buildSchoolSVG();
+  const svg = svgWrapper.querySelector('svg');
+
+  if (isPicker) {
+    // Pin marker
+    const pinEl = document.createElement('div');
+    pinEl.style.cssText = `
+      position:absolute; width:24px; height:24px; margin:-12px;
+      border-radius:50%; background:var(--pri); border:3px solid #fff;
+      box-shadow:0 2px 8px rgba(0,0,0,.4); pointer-events:none;
+      display:none; z-index:10;
+    `;
+    pinEl.id = 'formPin';
+    svgWrapper.appendChild(pinEl);
+
+    svg.addEventListener('click', e => {
+      const rect = svg.getBoundingClientRect();
+      const svgW = svg.viewBox.baseVal.width || 400;
+      const svgH = svg.viewBox.baseVal.height || 300;
+      const scaleX = svgW / rect.width;
+      const scaleY = svgH / rect.height;
+      const rawX = (e.clientX - rect.left) * scaleX;
+      const rawY = (e.clientY - rect.top) * scaleY;
+      pinX = rawX / svgW;
+      pinY = rawY / svgH;
+      pinEl.style.display = 'block';
+      pinEl.style.left = ((pinX * rect.width)) + 'px';
+      pinEl.style.top  = ((pinY * rect.height)) + 'px';
+      // Auto-select nearest zone chip
+      let minD = Infinity, nearest = null;
+      ZONES.forEach(z => {
+        const d = Math.hypot(z.x - pinX, z.y - pinY);
+        if (d < minD) { minD = d; nearest = z; }
+      });
+      if (nearest && minD < .25) {
+        selectedZone = nearest.id;
+        document.querySelectorAll('.chip').forEach(c => {
+          c.classList.toggle('active', c.dataset.zone === nearest.id);
+        });
+      }
+    });
+    container.appendChild(svgWrapper);
+  } else {
+    container.innerHTML = '';
+    container.appendChild(svgWrapper);
+  }
+}
+
+/* ──── Build Class Select ──── */
+function buildClassSelect() {
+  const sel = document.getElementById('selClass');
+  const viewSel = document.getElementById('classViewSel');
+  GRADES.forEach(g => {
+    for (let c = 1; c <= CLASSES_PER_GRADE; c++) {
+      const label = `${g}학년 ${c}반`;
+      const opt1 = new Option(label, label);
+      const opt2 = new Option(label, label);
+      sel.appendChild(opt1);
+      viewSel.appendChild(opt2);
+    }
+  });
+  viewSel.addEventListener('change', () => {
+    currentClassView = viewSel.value;
+    renderClassView();
+  });
+  currentClassView = viewSel.value;
+}
+
+/* ──── Zone Chips ──── */
+function buildZoneChips() {
+  const wrap = document.getElementById('zoneChips');
+  ZONES.forEach(z => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.dataset.zone = z.id;
+    btn.textContent = z.em + ' ' + z.id;
+    btn.onclick = () => {
+      selectedZone = z.id;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      // Move form pin to zone center
+      const pinEl = document.getElementById('formPin');
+      if (pinEl) {
+        pinX = z.x; pinY = z.y;
+        const container = document.getElementById('mapPicker');
+        const rect = container.querySelector('svg').getBoundingClientRect();
+        pinEl.style.display = 'block';
+        pinEl.style.left = (z.x * rect.width) + 'px';
+        pinEl.style.top  = (z.y * rect.height) + 'px';
+      }
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+/* ──── Photo handling ──── */
+document.addEventListener('DOMContentLoaded', () => {
+  const photoInput = document.getElementById('photoInput');
+  if (!photoInput) return;
+  photoInput.addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    photoData = await compressImg(file, 600, 0.78);
+    renderPhotoArea();
+  });
+});
+
+function renderPhotoArea() {
+  const area = document.getElementById('photoArea');
+  if (!area) return;
+  if (photoData) {
+    area.innerHTML = `
+      <img src="${photoData}" alt="업로드 사진" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px;">
+      <div class="photo-overlay">
+        <button onclick="event.stopPropagation();document.getElementById('photoInput').click()">📷 교체</button>
+        <button onclick="event.stopPropagation();clearPhoto()">✕ 삭제</button>
+      </div>`;
+    area.onclick = null;
+  } else {
+    area.innerHTML = `<div class="photo-icon">📷</div><div class="photo-hint">탭하여 사진 촬영 또는 선택</div>`;
+    area.onclick = () => document.getElementById('photoInput').click();
+  }
+}
+
+function clearPhoto() {
+  photoData = null;
+  document.getElementById('photoInput').value = '';
+  renderPhotoArea();
+}
+
+/* ──── Image Compression ──── */
+function compressImg(file, max, q) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      let {width: w, height: h} = img;
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h * max / w); w = max; }
+        else { w = Math.round(w * max / h); h = max; }
+      }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(img.src);
+      res(c.toDataURL('image/jpeg', q));
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/* ──── Submit ──── */
+async function handleSubmit() {
+  const cls   = document.getElementById('selClass').value;
+  const grp   = document.getElementById('selGroup').value;
+  const sp    = document.getElementById('inpSpecies').value.trim();
+  const notes = document.getElementById('inpNotes').value.trim();
+
+  if (!cls)  { toast('⚠️ 학년·반을 선택하세요'); return; }
+  if (!grp)  { toast('⚠️ 모둠을 선택하세요'); return; }
+  if (!sp)   { toast('⚠️ 생물 이름을 입력하세요'); return; }
+  if (!selectedZone && pinX === null) { toast('⚠️ 발견 장소를 선택하거나 지도에서 위치를 표시하세요'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '저장 중…';
+
+  try {
+    const data = {
+      class:     cls,
+      group:     grp,
+      species:   sp,
+      location:  selectedZone || '기타',
+      mapX:      pinX !== null ? pinX : (ZONES.find(z => z.id === selectedZone)?.x ?? 0.5),
+      mapY:      pinY !== null ? pinY : (ZONES.find(z => z.id === selectedZone)?.y ?? 0.5),
+      photo:     photoData || null,
+      notes:     notes,
+      timestamp: Date.now(),
+    };
+    await obsRef.push(data);
+    toast('✅ 기록이 저장되었어요!');
+    resetForm();
+  } catch(e) {
+    toast('❌ 저장 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📍 기록 저장하기';
+  }
+}
+
+function resetForm() {
+  document.getElementById('selClass').selectedIndex = 0;
+  document.getElementById('selGroup').selectedIndex = 0;
+  document.getElementById('inpSpecies').value = '';
+  document.getElementById('inpNotes').value = '';
+  selectedZone = null; pinX = null; pinY = null;
+  photoData = null;
+  document.getElementById('photoInput').value = '';
+  renderPhotoArea();
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  const pinEl = document.getElementById('formPin');
+  if (pinEl) pinEl.style.display = 'none';
+}
+
+/* ──── Map Rendering ──── */
+function classColor(className) {
+  // Derive index from class string
+  const g = parseInt(className) || 1;
+  const c = parseInt((className.match(/(\d+)반/) || [])[1]) || 1;
+  const idx = ((g - 1) * 20 + (c - 1)) % CLS_COLORS.length;
+  return CLS_COLORS[idx];
+}
+
+function renderMapPins() {
+  // Main map
+  const container = document.getElementById('mainMapContainer');
+  if (!container) return;
+  // Remove old pins
+  container.querySelectorAll('.obs-pin, .obs-pin-emoji').forEach(el => el.remove());
+
+  const svgEl = container.querySelector('svg');
+  if (!svgEl) return;
+
+  Object.entries(observations).forEach(([id, obs]) => {
+    if (activeFilter !== 'all' && obs.class !== activeFilter) return;
+    addPin(container, id, obs, svgEl);
+  });
+
+  // Update filter chips for classes present
+  renderClassFilterChips();
+  renderLegend();
+}
+
+function addPin(container, id, obs, svgEl) {
+  const rect = svgEl.getBoundingClientRect();
+  const color = classColor(obs.class);
+
+  const pin = document.createElement('div');
+  if (obs.photo) {
+    pin.className = 'obs-pin';
+    pin.style.cssText = `left:${obs.mapX*100}%;top:${obs.mapY*100}%;border-color:${color};`;
+    pin.innerHTML = `<img src="${obs.photo}" alt="${obs.species}">`;
+  } else {
+    pin.className = 'obs-pin-emoji';
+    pin.style.cssText = `left:${obs.mapX*100}%;top:${obs.mapY*100}%;`;
+    const zone = ZONES.find(z => z.id === obs.location);
+    pin.textContent = zone ? zone.em : '📍';
+  }
+  pin.title = `${obs.species} (${obs.class} ${obs.group})`;
+  pin.onclick = () => openModal(id, obs);
+  container.firstElementChild.appendChild(pin);
+}
+
+function renderClassFilterChips() {
+  const classesPresent = [...new Set(Object.values(observations).map(o => o.class))].sort();
+  const wrap = document.getElementById('classFilterChips');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  classesPresent.forEach(cls => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-chip' + (activeFilter === cls ? ' active' : '');
+    btn.textContent = cls;
+    btn.style.borderColor = classColor(cls);
+    if (activeFilter === cls) btn.style.background = classColor(cls);
+    btn.onclick = () => {
+      activeFilter = cls;
+      document.querySelectorAll('.filter-chip').forEach(c => {
+        c.classList.remove('active');
+        c.style.background = '';
+      });
+      btn.classList.add('active');
+      btn.style.background = classColor(cls);
+      renderMapPins();
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+function renderLegend() {
+  const legend = document.getElementById('mapLegend');
+  if (!legend) return;
+  const classesPresent = [...new Set(Object.values(observations).map(o => o.class))].sort();
+  if (!classesPresent.length) { legend.innerHTML = ''; return; }
+  legend.innerHTML = `<div class="legend-title">학급 범례</div>
+    <div class="legend-items">
+      ${classesPresent.map(cls => `
+        <div style="display:flex;align-items:center;font-size:12px;color:var(--txt2);">
+          <span class="legend-dot" style="background:${classColor(cls)}"></span>${cls}
+        </div>`).join('')}
+    </div>`;
+}
+
+/* ──── Class View ──── */
+function renderClassView() {
+  const cls = document.getElementById('classViewSel')?.value || '';
+  currentClassView = cls;
+
+  const clsObs = Object.entries(observations).filter(([, o]) => o.class === cls);
+
+  // Map
+  const container = document.getElementById('classMapContainer');
+  if (container) {
+    container.querySelectorAll('.obs-pin, .obs-pin-emoji').forEach(el => el.remove());
+    const svgEl = container.querySelector('svg');
+    if (svgEl) {
+      clsObs.forEach(([id, obs]) => addPin(container, id, obs, svgEl));
+    }
+  }
+
+  // Stats
+  const statsBar = document.getElementById('statsBar');
+  if (statsBar) {
+    const uniqueSpecies = [...new Set(clsObs.map(([,o]) => o.species))];
+    const uniqueZones   = [...new Set(clsObs.map(([,o]) => o.location))];
+    statsBar.innerHTML = `
+      <div class="stats-title">${cls || '— '} 통계</div>
+      <div class="stats-grid">
+        <div class="stat-item"><div class="stat-num">${clsObs.length}</div><div class="stat-label">총 관측 수</div></div>
+        <div class="stat-item"><div class="stat-num">${uniqueSpecies.length}</div><div class="stat-label">종 수</div></div>
+        <div class="stat-item"><div class="stat-num">${uniqueZones.length}</div><div class="stat-label">탐사 구역</div></div>
+      </div>`;
+  }
+
+  // List
+  const list = document.getElementById('obsList');
+  if (!list) return;
+  if (!clsObs.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>아직 이 학급의 기록이 없어요</p></div>`;
+    return;
+  }
+  list.innerHTML = '';
+  clsObs.sort(([,a],[,b]) => b.timestamp - a.timestamp).forEach(([id, obs]) => {
+    const zone = ZONES.find(z => z.id === obs.location);
+    const card = document.createElement('div');
+    card.className = 'obs-card';
+    card.innerHTML = `
+      ${obs.photo
+        ? `<img class="obs-card-img" src="${obs.photo}" alt="${obs.species}">`
+        : `<div class="obs-card-img-placeholder">${zone ? zone.em : '📍'}</div>`}
+      <div class="obs-card-body">
+        <div class="obs-card-species">${obs.species}</div>
+        <div class="obs-card-meta">${obs.group} · ${obs.location}</div>
+        ${obs.notes ? `<div class="obs-card-notes">${obs.notes}</div>` : ''}
+        <div class="obs-card-time">${formatTime(obs.timestamp)}</div>
+      </div>
+      <button class="obs-card-del" onclick="deleteObs('${id}')" title="삭제">🗑️</button>`;
+    card.querySelector('.obs-card-body').onclick = () => openModal(id, obs);
+    list.appendChild(card);
+  });
+}
+
+/* ──── Delete ──── */
+async function deleteObs(id) {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  try {
+    await obsRef.child(id).remove();
+    toast('🗑️ 삭제되었습니다');
+  } catch(e) {
+    toast('❌ 삭제 실패: ' + e.message);
+  }
+}
+
+/* ──── Modal ──── */
+function openModal(id, obs) {
+  const zone = ZONES.find(z => z.id === obs.location);
+  document.getElementById('modalContent').innerHTML = `
+    ${obs.photo ? `<img class="modal-img" src="${obs.photo}" alt="${obs.species}">` : ''}
+    <div class="modal-body">
+      <div class="modal-species">${zone ? zone.em : '📍'} ${obs.species}</div>
+      <div class="modal-row">
+        <span class="modal-badge">📚 ${obs.class}</span>
+        <span class="modal-badge">👥 ${obs.group}</span>
+        <span class="modal-badge">📍 ${obs.location}</span>
+      </div>
+      ${obs.notes ? `<div class="modal-notes">${obs.notes}</div>` : ''}
+      <div class="modal-time">${formatTime(obs.timestamp)}</div>
+    </div>`;
+  document.getElementById('modalBg').classList.add('open');
+}
+
+/* ──── Tab Navigation ──── */
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+
+  if (tabId === 'tab-map') renderMapPins();
+  if (tabId === 'tab-class') renderClassView();
+}
+
+/* ──── Theme ──── */
+function applyTheme() {
+  const root = document.documentElement;
+  if (themeMode === 'dark') root.setAttribute('data-theme', 'dark');
+  else if (themeMode === 'light') root.setAttribute('data-theme', 'light');
+  else root.removeAttribute('data-theme');
+  const btn = document.getElementById('themeBtn');
+  if (btn) btn.textContent = themeMode === 'dark' ? '☀️' : '🌙';
+}
+
+/* ──── Utilities ──── */
+function formatTime(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+/* ──── Event Bindings ──── */
+function bindUI() {
+  // Nav buttons
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Submit
+  document.getElementById('submitBtn').addEventListener('click', handleSubmit);
+
+  // Modal close
+  document.getElementById('modalClose').addEventListener('click', () => {
+    document.getElementById('modalBg').classList.remove('open');
+  });
+  document.getElementById('modalBg').addEventListener('click', e => {
+    if (e.target === document.getElementById('modalBg')) {
+      document.getElementById('modalBg').classList.remove('open');
+    }
+  });
+
+  // All filter chip
+  document.querySelector('[data-filter="all"]').addEventListener('click', function() {
+    activeFilter = 'all';
+    document.querySelectorAll('.filter-chip').forEach(c => {
+      c.classList.remove('active');
+      c.style.background = '';
+    });
+    this.classList.add('active');
+    renderMapPins();
+  });
+
+  // Theme toggle
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    themeMode = themeMode === 'dark' ? 'light' : (themeMode === 'light' ? 'auto' : 'dark');
+    localStorage.setItem('theme', themeMode);
+    applyTheme();
+  });
+
+  // Refresh
+  document.getElementById('refreshBtn').addEventListener('click', () => {
+    toast('🔄 최신 데이터 로딩 중…');
+  });
+
+  // Photo area initial render
+  renderPhotoArea();
+}
+
+// Expose global functions needed by inline handlers
+window.deleteObs = deleteObs;
+window.clearPhoto = clearPhoto;
+</script>
+</body>
+</html>
