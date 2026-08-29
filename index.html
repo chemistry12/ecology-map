@@ -48,6 +48,28 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 input, select, textarea { font-family: inherit; }
 img { max-width: 100%; }
 
+
+/* ───── 내 기록 Tab ───── */
+.mine-wrap { padding: 16px; }
+.mine-search-row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+
+/* ───── Admin badge ───── */
+.admin-active #adminBtn { color: var(--acc); }
+.admin-badge {
+  background: var(--acc); color: #fff; font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 99px; margin-left: 6px; vertical-align: middle;
+}
+/* ───── Edit/Delete btns in cards ───── */
+.admin-actions { display: flex; gap: 8px; margin-top: 10px; }
+.btn-edit {
+  flex: 1; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  background: var(--surf2); color: var(--txt); border: 1px solid var(--bdr);
+}
+.btn-del {
+  flex: 1; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  background: #FEE; color: var(--danger); border: 1px solid #FBCACA;
+}
+
 /* ───── Setup Screen ───── */
 #setup {
   position: fixed; inset: 0; background: var(--bg);
@@ -532,6 +554,19 @@ const FB_CONFIG = {
       </div>
     </div>
 
+
+    <!-- ── Tab 4: 내 기록 ── -->
+    <div class="tab-pane" id="tab-mine">
+      <div class="mine-wrap">
+        <div class="mine-search-row">
+          <input class="inp" id="mineStudentId" type="text" inputmode="numeric" placeholder="학번 입력 (예: 10101)" style="flex:1;max-width:180px;">
+          <button class="btn-pri" id="mineLookupBtn" style="padding:10px 18px;">조회</button>
+        </div>
+        <div id="mineCount" style="font-size:13px;color:var(--txt2);padding:0 16px 4px;"></div>
+        <div class="obs-list" id="mineList"></div>
+      </div>
+    </div>
+
   </div><!-- /tab-content -->
 
   <!-- Bottom Nav -->
@@ -545,8 +580,39 @@ const FB_CONFIG = {
     <button class="nav-btn" data-tab="tab-class">
       <span class="nav-icon">📊</span>학급별
     </button>
+    <button class="nav-btn" data-tab="tab-mine">
+      <span class="nav-icon">🧑</span>내 기록
+    </button>
   </nav>
 </div><!-- /app -->
+
+
+<!-- Admin Login Modal -->
+<div class="modal-bg" id="adminLoginBg" style="display:none;">
+  <div class="modal" id="adminLoginModal" style="max-width:320px;">
+    <h3 style="margin-bottom:16px;color:var(--pri);">🔐 관리자 로그인</h3>
+    <input class="inp" id="adminPwInput" type="password" placeholder="관리자 비밀번호" style="margin-bottom:12px;">
+    <div style="display:flex;gap:8px;">
+      <button class="btn-sec" id="adminLoginCancel" style="flex:1;">취소</button>
+      <button class="btn-pri" id="adminLoginOk" style="flex:1;">확인</button>
+    </div>
+    <p id="adminPwError" style="color:var(--danger);font-size:12px;margin-top:8px;display:none;">비밀번호가 틀렸습니다.</p>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-bg" id="editModalBg" style="display:none;">
+  <div class="modal" id="editModal" style="max-width:420px;">
+    <h3 style="margin-bottom:16px;color:var(--pri);">✏️ 기록 수정</h3>
+    <input class="inp" id="editSpecies" type="text" placeholder="생물 이름" style="margin-bottom:10px;">
+    <input class="inp" id="editNotes" type="text" placeholder="메모" style="margin-bottom:10px;">
+    <select class="inp" id="editLocation" style="margin-bottom:10px;"></select>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn-sec" id="editCancel" style="flex:1;">취소</button>
+      <button class="btn-pri" id="editSave" style="flex:1;">저장</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal -->
 <div class="modal-bg" id="modalBg">
@@ -609,6 +675,9 @@ let photoData = null;
 let activeFilter = 'all';
 let currentClassView = '';
 let themeMode = localStorage.getItem('theme') || 'auto';
+let adminMode = false;
+const ADMIN_PW = '1990';
+let editingId = null;
 
 /* ──── Boot ──── */
 window.addEventListener('DOMContentLoaded', () => {
@@ -1047,6 +1116,11 @@ async function deleteObs(id) {
 /* ──── Modal ──── */
 function openModal(id, obs) {
   const zone = ZONES.find(z => z.id === obs.location);
+  const adminActions = adminMode ? `
+    <div class="admin-actions">
+      <button class="btn-edit" onclick="openEditModal('${id}')">✏️ 수정</button>
+      <button class="btn-del" onclick="confirmDelete('${id}', '${obs.species}')">🗑️ 삭제</button>
+    </div>` : '';
   document.getElementById('modalContent').innerHTML = `
     ${obs.photo ? `<img class="modal-img" src="${obs.photo}" alt="${obs.species}">` : ''}
     <div class="modal-body">
@@ -1059,6 +1133,7 @@ function openModal(id, obs) {
       </div>
       ${obs.notes ? `<div class="modal-notes">${obs.notes}</div>` : ''}
       <div class="modal-time">${formatTime(obs.timestamp)}</div>
+      ${adminActions}
     </div>`;
   document.getElementById('modalBg').classList.add('open');
 }
@@ -1100,8 +1175,136 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
+
+/* ──── Admin Mode ──── */
+function toggleAdminLogin() {
+  if (adminMode) {
+    adminMode = false;
+    document.getElementById('app').classList.remove('admin-active');
+    document.getElementById('adminBtn').textContent = '🔒';
+    toast('🔒 관리자 모드 해제');
+  } else {
+    document.getElementById('adminPwInput').value = '';
+    document.getElementById('adminPwError').style.display = 'none';
+    document.getElementById('adminLoginBg').style.display = 'flex';
+    setTimeout(() => document.getElementById('adminPwInput').focus(), 100);
+  }
+}
+
+function tryAdminLogin() {
+  const pw = document.getElementById('adminPwInput').value;
+  if (pw === ADMIN_PW) {
+    adminMode = true;
+    document.getElementById('adminLoginBg').style.display = 'none';
+    document.getElementById('app').classList.add('admin-active');
+    document.getElementById('adminBtn').textContent = '🔓';
+    toast('🔓 관리자 모드 활성화');
+  } else {
+    document.getElementById('adminPwError').style.display = 'block';
+  }
+}
+
+/* ──── Edit Record ──── */
+function openEditModal(id) {
+  editingId = id;
+  const obs = observations[id];
+  if (!obs) return;
+  document.getElementById('editSpecies').value = obs.species || '';
+  document.getElementById('editNotes').value = obs.notes || '';
+  // Build location select
+  const sel = document.getElementById('editLocation');
+  sel.innerHTML = '';
+  ZONES.forEach(z => {
+    const opt = document.createElement('option');
+    opt.value = z.id;
+    opt.textContent = z.em + ' ' + z.id;
+    if (z.id === obs.location) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  document.getElementById('modalBg').classList.remove('open');
+  document.getElementById('editModalBg').style.display = 'flex';
+}
+
+function saveEdit() {
+  if (!editingId || !obsRef) return;
+  const species = document.getElementById('editSpecies').value.trim();
+  const notes = document.getElementById('editNotes').value.trim();
+  const location = document.getElementById('editLocation').value;
+  if (!species) { toast('생물 이름을 입력하세요.'); return; }
+  obsRef.child(editingId).update({ species, notes, location }, err => {
+    if (err) { toast('❌ 저장 실패: ' + err.message); return; }
+    toast('✅ 수정 완료');
+    document.getElementById('editModalBg').style.display = 'none';
+    editingId = null;
+  });
+}
+
+/* ──── Delete Record ──── */
+function confirmDelete(id, species) {
+  if (!confirm(`"${species}" 기록을 삭제할까요?`)) return;
+  document.getElementById('modalBg').classList.remove('open');
+  obsRef.child(id).remove(err => {
+    if (err) { toast('❌ 삭제 실패: ' + err.message); return; }
+    toast('🗑️ 삭제 완료');
+  });
+}
+
+/* ──── My Records ──── */
+function lookupMine() {
+  const sid = document.getElementById('mineStudentId').value.trim();
+  if (!sid) { toast('학번을 입력하세요.'); return; }
+  const myObs = Object.entries(observations).filter(([, o]) => o.studentId === sid);
+  const count = document.getElementById('mineCount');
+  const list = document.getElementById('mineList');
+  if (myObs.length === 0) {
+    count.textContent = '기록이 없습니다.';
+    list.innerHTML = '';
+    return;
+  }
+  count.textContent = `총 ${myObs.length}개의 기록`;
+  list.innerHTML = '';
+  myObs.sort(([,a],[,b]) => b.timestamp - a.timestamp).forEach(([id, obs]) => {
+    const zone = ZONES.find(z => z.id === obs.location);
+    const card = document.createElement('div');
+    card.className = 'obs-card';
+    card.innerHTML = `
+      ${obs.photo ? `<img class="obs-thumb" src="${obs.photo}" alt="${obs.species}">` : ''}
+      <div class="obs-card-body">
+        <div class="obs-card-title">${zone ? zone.em : '📍'} ${obs.species}</div>
+        <div class="obs-card-meta">${obs.location} · ${obs.class} ${obs.group}</div>
+        <div class="obs-card-meta">${formatTime(obs.timestamp)}</div>
+        ${obs.notes ? `<div class="obs-card-notes">${obs.notes}</div>` : ''}
+      </div>`;
+    card.onclick = () => openModal(id, obs);
+    list.appendChild(card);
+  });
+}
+
 /* ──── Event Bindings ──── */
 function bindUI() {
+
+  // Admin
+  document.getElementById('adminBtn').addEventListener('click', toggleAdminLogin);
+  document.getElementById('adminLoginCancel').addEventListener('click', () => {
+    document.getElementById('adminLoginBg').style.display = 'none';
+  });
+  document.getElementById('adminLoginOk').addEventListener('click', tryAdminLogin);
+  document.getElementById('adminPwInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') tryAdminLogin();
+  });
+
+  // Edit modal
+  document.getElementById('editCancel').addEventListener('click', () => {
+    document.getElementById('editModalBg').style.display = 'none';
+  });
+  document.getElementById('editSave').addEventListener('click', saveEdit);
+
+  // My records
+  document.getElementById('mineLookupBtn').addEventListener('click', lookupMine);
+  document.getElementById('mineStudentId').addEventListener('keydown', e => {
+    if (e.key === 'Enter') lookupMine();
+  });
+
   // Nav buttons
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -1150,6 +1353,8 @@ function bindUI() {
 // Expose global functions needed by inline handlers
 window.deleteObs = deleteObs;
 window.clearPhoto = clearPhoto;
+window.openEditModal = openEditModal;
+window.confirmDelete = confirmDelete;
 </script>
 </body>
 </html>
