@@ -70,6 +70,15 @@ img { max-width: 100%; }
   background: #FEE; color: var(--danger); border: 1px solid #FBCACA;
 }
 
+
+/* GPS button */
+.btn-gps {
+  padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  background: var(--surf2); color: var(--pri); border: 1.5px solid var(--pri-m);
+  white-space: nowrap; flex-shrink: 0;
+}
+.btn-gps:active { background: var(--pri-m); color: #fff; }
+
 /* ───── Setup Screen ───── */
 #setup {
   position: fixed; inset: 0; background: var(--bg);
@@ -186,7 +195,9 @@ textarea.inp { height: 80px; resize: none; }
 .map-picker-wrap {
   border-radius: var(--r); overflow: hidden; border: 1.5px solid var(--bdr);
   background: var(--surf2); position: relative; touch-action: none;
+  max-height: 220px;
 }
+.map-picker-wrap img { max-height: 220px; width: 100%; object-fit: cover; object-position: center; }
 .map-picker-wrap svg { display: block; width: 100%; height: auto; cursor: crosshair; }
 .map-pin-label {
   position: absolute; background: var(--pri); color: #fff;
@@ -512,7 +523,7 @@ const FB_CONFIG = {
 
         <!-- 발견 장소 — Chip -->
         <div class="form-section">
-          <label>발견 장소 <span style="font-weight:400;color:var(--txt2)">(구역 선택 또는 지도에서 핀 찍기)</span></label>
+          <div style="display:flex;align-items:center;justify-content:space-between;"><label>발견 장소 <span style="font-weight:400;color:var(--txt2)">(구역 또는 지도 핀)</span></label><button type="button" class="btn-gps" id="gpsBtn">📡 현재 위치</button></div>
           <div class="chips" id="zoneChips" style="margin-bottom:10px;"></div>
           <div class="map-picker-wrap" id="mapPicker">
             <div class="map-pin-label" id="mapPinLabel"></div>
@@ -767,9 +778,8 @@ function injectMapSVG(containerId, isPicker) {
       pinEl.style.left = (pinX * rect.width)  + 'px';
       pinEl.style.top  = (pinY * rect.height) + 'px';
     }
-    wrapper.addEventListener('click', e => {
-      movePinTo(e.clientX, e.clientY);
-      const rect = mapImg.getBoundingClientRect();
+    function handleMapTap(clientX, clientY) {
+      movePinTo(clientX, clientY);
       // Auto-select nearest zone chip
       let minD = Infinity, nearest = null;
       ZONES.forEach(z => {
@@ -782,6 +792,17 @@ function injectMapSVG(containerId, isPicker) {
           c.classList.toggle('active', c.dataset.zone === nearest.id);
         });
       }
+    }
+    // Mobile: use touchend to avoid scroll conflict
+    wrapper.addEventListener('touchend', e => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      handleMapTap(t.clientX, t.clientY);
+    }, { passive: false });
+    // Desktop fallback
+    wrapper.addEventListener('click', e => {
+      // skip if touch already handled
+      handleMapTap(e.clientX, e.clientY);
     });
     container.appendChild(wrapper);
   } else {
@@ -840,6 +861,91 @@ function buildZoneChips() {
 document.addEventListener('DOMContentLoaded', () => {
   const photoInput = document.getElementById('photoInput');
   if (!photoInput) return;
+  // EXIF GPS helper
+  function readExifGPS(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const buf = ev.target.result;
+          const view = new DataView(buf);
+          // Check JPEG SOI
+          if (view.getUint16(0) !== 0xFFD8) { resolve(null); return; }
+          let offset = 2;
+          while (offset < view.byteLength - 4) {
+            const marker = view.getUint16(offset);
+            const len = view.getUint16(offset + 2);
+            if (marker === 0xFFE1) { // APP1 - EXIF
+              const exifStr = String.fromCharCode(...new Uint8Array(buf, offset + 4, 4));
+              if (exifStr === 'Exif') {
+                const tiffStart = offset + 10;
+                const endian = view.getUint16(tiffStart) === 0x4949 ? true : false; // little endian
+                const getUint16 = (o) => endian ? view.getUint16(tiffStart+o, true) : view.getUint16(tiffStart+o, false);
+                const getUint32 = (o) => endian ? view.getUint32(tiffStart+o, true) : view.getUint32(tiffStart+o, false);
+                const ifdOffset = getUint32(4);
+                const numEntries = getUint16(ifdOffset);
+                let gpsIfdOffset = null;
+                for (let i = 0; i < numEntries; i++) {
+                  const entryOffset = ifdOffset + 2 + i * 12;
+                  const tag = getUint16(entryOffset);
+                  if (tag === 0x8825) { // GPS IFD pointer
+                    gpsIfdOffset = getUint32(entryOffset + 8);
+                    break;
+                  }
+                }
+                if (gpsIfdOffset === null) { resolve(null); return; }
+                const gpsEntries = getUint16(gpsIfdOffset);
+                let lat = null, lon = null, latRef = 'N', lonRef = 'E';
+                for (let i = 0; i < gpsEntries; i++) {
+                  const eo = gpsIfdOffset + 2 + i * 12;
+                  const tag = getUint16(eo);
+                  const type = getUint16(eo + 2);
+                  const valOffset = getUint32(eo + 8);
+                  const readRat = (o) => {
+                    const num = endian ? view.getUint32(tiffStart+o, true) : view.getUint32(tiffStart+o, false);
+                    const den = endian ? view.getUint32(tiffStart+o+4, true) : view.getUint32(tiffStart+o+4, false);
+                    return den ? num/den : 0;
+                  };
+                  if (tag === 1) latRef = String.fromCharCode(view.getUint8(tiffStart + valOffset));
+                  if (tag === 3) lonRef = String.fromCharCode(view.getUint8(tiffStart + valOffset));
+                  if (tag === 2) {
+                    const d = readRat(valOffset), m = readRat(valOffset+8), s = readRat(valOffset+16);
+                    lat = d + m/60 + s/3600;
+                  }
+                  if (tag === 4) {
+                    const d = readRat(valOffset), m = readRat(valOffset+8), s = readRat(valOffset+16);
+                    lon = d + m/60 + s/3600;
+                  }
+                }
+                if (lat && lon) {
+                  if (latRef === 'S') lat = -lat;
+                  if (lonRef === 'W') lon = -lon;
+                  resolve({ lat, lon });
+                } else resolve(null);
+              } else resolve(null);
+              return;
+            }
+            offset += 2 + len;
+          }
+          resolve(null);
+        } catch(e) { resolve(null); }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // 영생고등학교, 수원시 장안구 서부로2198번길 22
+  // 지도 이미지 경계 위경도 (오차 있을 수 있음 — 핀 위치 안맞으면 조정)
+  const MAP_BOUNDS = {
+    north: 37.2975, south: 37.2910,
+    west:  126.9685, east:  126.9775
+  };
+  function gpsToMapXY(lat, lon) {
+    const x = (lon - MAP_BOUNDS.west) / (MAP_BOUNDS.east - MAP_BOUNDS.west);
+    const y = (MAP_BOUNDS.north - lat) / (MAP_BOUNDS.north - MAP_BOUNDS.south);
+    return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+  }
+
   photoInput.addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1176,6 +1282,52 @@ function toast(msg) {
 }
 
 
+
+/* ──── GPS Auto Pin ──── */
+function gpsAutoPin() {
+  const btn = document.getElementById('gpsBtn');
+  if (!navigator.geolocation) { toast('이 브라우저는 GPS를 지원하지 않습니다.'); return; }
+  btn.textContent = '⏳ 위치 확인 중…';
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(pos => {
+    btn.textContent = '📡 현재 위치';
+    btn.disabled = false;
+    const { latitude: lat, longitude: lon } = pos.coords;
+    const pos2 = gpsToMapXY(lat, lon);
+    if (pos2.x <= 0.01 || pos2.x >= 0.99 || pos2.y <= 0.01 || pos2.y >= 0.99) {
+      toast('⚠️ 현재 위치가 학교 지도 범위 밖입니다.');
+      return;
+    }
+    pinX = pos2.x; pinY = pos2.y;
+    const pinEl = document.getElementById('formPin');
+    const container = document.getElementById('mapPicker');
+    const imgEl = container ? container.querySelector('img') : null;
+    if (pinEl && imgEl) {
+      const rect = imgEl.getBoundingClientRect();
+      pinEl.style.display = 'block';
+      pinEl.style.left = (pos2.x * rect.width) + 'px';
+      pinEl.style.top  = (pos2.y * rect.height) + 'px';
+    }
+    // Auto-select nearest zone
+    let minD = Infinity, nearest = null;
+    ZONES.forEach(z => {
+      const d = Math.hypot(z.x - pinX, z.y - pinY);
+      if (d < minD) { minD = d; nearest = z; }
+    });
+    if (nearest && minD < .25) {
+      selectedZone = nearest.id;
+      document.querySelectorAll('.chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.zone === nearest.id);
+      });
+    }
+    toast('📍 현재 GPS 위치로 핀 설정됨');
+  }, err => {
+    btn.textContent = '📡 현재 위치';
+    btn.disabled = false;
+    toast('❌ GPS 오류: ' + (err.code === 1 ? '위치 권한을 허용해주세요' : err.message));
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
 /* ──── Admin Mode ──── */
 function toggleAdminLogin() {
   if (adminMode) {
@@ -1282,6 +1434,10 @@ function lookupMine() {
 
 /* ──── Event Bindings ──── */
 function bindUI() {
+
+  // GPS button
+  const gpsBtnEl = document.getElementById('gpsBtn');
+  if (gpsBtnEl) gpsBtnEl.addEventListener('click', gpsAutoPin);
 
   // Admin
   document.getElementById('adminBtn').addEventListener('click', toggleAdminLogin);
