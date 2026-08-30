@@ -528,6 +528,12 @@ const FB_CONFIG = {
     <div class="tab-pane active" id="tab-record">
       <div class="form-wrap">
 
+        <!-- 학생 정보 고정 안내 -->
+        <div id="studentFixedBanner" style="display:none;background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--r);padding:8px 12px;margin-bottom:10px;font-size:13px;color:var(--txt2);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span>📌 학생 정보가 고정되어 있어요</span>
+          <button type="button" style="font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt);cursor:pointer;" onclick="clearStudentInfo()">초기화</button>
+        </div>
+
         <!-- 학급 / 조 / 학번 / 이름 -->
         <div class="form-section">
           <label>학급 & 조</label>
@@ -769,6 +775,37 @@ function initApp() {
   initFormMap();
   initFirebase();
   bindUI();
+  applyStudentInfo(); // 저장된 학생 정보 자동 복원
+  bindStudentIdValidation(); // 학번 실시간 검증
+}
+
+function bindStudentIdValidation() {
+  const selClass = document.getElementById('selClass');
+  const inpSid   = document.getElementById('inpStudentId');
+  const hint     = document.createElement('div');
+  hint.id = 'sidHint';
+  hint.style.cssText = 'font-size:12px;margin-top:4px;min-height:16px;';
+  inpSid.parentNode.insertBefore(hint, inpSid.nextSibling);
+
+  function checkSid() {
+    const cls = selClass.value;
+    const sid = inpSid.value.trim();
+    if (!cls || !sid) { hint.textContent = ''; return; }
+    const prefix = expectedSidPrefix(cls);
+    if (!prefix) { hint.textContent = ''; return; }
+    if (!sid.startsWith(prefix)) {
+      hint.style.color = 'var(--danger, #e53)';
+      hint.textContent = `❌ ${cls}은 ${prefix}○○ 형식이어야 해요`;
+    } else if (!/^\d{5}$/.test(sid)) {
+      hint.style.color = 'var(--danger, #e53)';
+      hint.textContent = '❌ 숫자 5자리로 입력하세요';
+    } else {
+      hint.style.color = 'var(--pri)';
+      hint.textContent = '✅ 학번 형식 확인됨';
+    }
+  }
+  inpSid.addEventListener('input', checkSid);
+  selClass.addEventListener('change', checkSid);
 }
 
 /* ──── Firebase ──── */
@@ -1043,6 +1080,66 @@ function compressImg(file, max, q) {
   });
 }
 
+/* ──── Student Info Persistence ──── */
+const STUDENT_KEY = 'ys_student_info';
+
+function saveStudentInfo(cls, grp, sid, name) {
+  try { localStorage.setItem(STUDENT_KEY, JSON.stringify({ cls, grp, sid, name })); } catch(e) {}
+}
+
+function loadStudentInfo() {
+  try { return JSON.parse(localStorage.getItem(STUDENT_KEY) || 'null'); } catch(e) { return null; }
+}
+
+function applyStudentInfo() {
+  const info = loadStudentInfo();
+  const banner = document.getElementById('studentFixedBanner');
+  if (!info) { if (banner) banner.style.display = 'none'; return; }
+  const selClass = document.getElementById('selClass');
+  const selGroup = document.getElementById('selGroup');
+  if (info.cls) selClass.value = info.cls;
+  if (info.grp) selGroup.value = info.grp;
+  if (info.sid) document.getElementById('inpStudentId').value = info.sid;
+  if (info.name) document.getElementById('inpName').value = info.name;
+  if (banner) banner.style.display = 'flex';
+}
+
+function clearStudentInfo() {
+  try { localStorage.removeItem(STUDENT_KEY); } catch(e) {}
+  const banner = document.getElementById('studentFixedBanner');
+  if (banner) banner.style.display = 'none';
+  document.getElementById('selClass').selectedIndex = 0;
+  document.getElementById('selGroup').selectedIndex = 0;
+  document.getElementById('inpStudentId').value = '';
+  document.getElementById('inpName').value = '';
+  const hint = document.getElementById('sidHint');
+  if (hint) hint.textContent = '';
+  toast('학생 정보가 초기화되었어요');
+}
+window.clearStudentInfo = clearStudentInfo;
+
+/* 반 번호 → 학번 접두사 (1반→101, 10반→110) */
+function expectedSidPrefix(classStr) {
+  // classStr 예: "1학년 1반", "1학년 10반"
+  const m = classStr.match(/(\d+)반$/);
+  if (!m) return null;
+  const num = parseInt(m[1], 10);
+  return '1' + String(num).padStart(2, '0'); // 1반→"101", 10반→"110"
+}
+
+function validateStudentId(cls, sid) {
+  if (!sid) return null; // 학번 미입력은 별도 검증 없음 (선택 사항)
+  const prefix = expectedSidPrefix(cls);
+  if (!prefix) return null;
+  if (!sid.startsWith(prefix)) {
+    return `⚠️ ${cls} 학번은 ${prefix}로 시작해야 해요 (입력: ${sid})`;
+  }
+  if (!/^\d{5}$/.test(sid)) {
+    return '⚠️ 학번은 숫자 5자리로 입력하세요 (예: 10101)';
+  }
+  return null;
+}
+
 /* ──── Submit ──── */
 async function handleSubmit() {
   const cls   = document.getElementById('selClass').value;
@@ -1063,6 +1160,8 @@ async function handleSubmit() {
   if (!cls)  { showErr('⚠️ 학년·반을 선택하세요'); return; }
   if (!grp)  { showErr('⚠️ 조를 선택하세요'); return; }
   if (!name) { showErr('⚠️ 이름을 입력하세요'); return; }
+  const sidErr = validateStudentId(cls, sid);
+  if (sidErr) { showErr(sidErr); return; }
   if (!sp)   { showErr('⚠️ 생물 이름을 입력하세요'); return; }
   if (!selectedZone && pinLat === null) { showErr('⚠️ 발견 위치를 선택하거나 지도에 핀을 찍으세요'); return; }
 
@@ -1085,7 +1184,10 @@ async function handleSubmit() {
       timestamp: Date.now(),
     };
     await obsRef.push(data);
+    saveStudentInfo(cls, grp, sid, name); // 학생 정보 고정 저장
     toast('✅ 기록이 저장되었어요!');
+    const banner = document.getElementById('studentFixedBanner');
+    if (banner) banner.style.display = 'flex';
     resetForm();
   } catch(e) {
     toast('❌ 저장 실패: ' + e.message);
@@ -1096,10 +1198,21 @@ async function handleSubmit() {
 }
 
 function resetForm() {
-  document.getElementById('selClass').selectedIndex = 0;
-  document.getElementById('selGroup').selectedIndex = 0;
-  document.getElementById('inpStudentId').value = '';
-  document.getElementById('inpName').value = '';
+  // 학생 정보는 고정 — 저장된 값으로 복원 (없으면 초기화)
+  const info = loadStudentInfo();
+  if (info) {
+    const selClass = document.getElementById('selClass');
+    const selGroup = document.getElementById('selGroup');
+    selClass.value = info.cls || '';
+    selGroup.value = info.grp || '';
+    document.getElementById('inpStudentId').value = info.sid || '';
+    document.getElementById('inpName').value = info.name || '';
+  } else {
+    document.getElementById('selClass').selectedIndex = 0;
+    document.getElementById('selGroup').selectedIndex = 0;
+    document.getElementById('inpStudentId').value = '';
+    document.getElementById('inpName').value = '';
+  }
   document.getElementById('inpSpecies').value = '';
   document.getElementById('inpNotes').value = '';
   selectedZone = null; pinLat = null; pinLng = null;
