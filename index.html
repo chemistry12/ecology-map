@@ -301,6 +301,29 @@ textarea.inp { height: 80px; resize: none; }
   .stats-bar, #groupFilterRow, #obsListClass, .class-breakdown { max-width: 900px; margin-left: auto; margin-right: auto; }
 }
 
+/* 지도 제스처 오버레이 */
+.map-gesture-overlay {
+  position: absolute; inset: 0; z-index: 600;
+  pointer-events: auto; /* 기본: 터치 가로채기 (페이지 스크롤 허용) */
+}
+.map-gesture-hint {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,.68); color: #fff;
+  padding: 10px 20px; border-radius: 12px;
+  font-size: 13px; font-weight: 600; line-height: 1.6;
+  text-align: center; pointer-events: none;
+  opacity: 0; transition: opacity .25s;
+  white-space: nowrap;
+}
+/* 스크롤 힌트 (데스크톱) */
+.map-scroll-hint {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.6); color: #fff; padding: 6px 14px;
+  border-radius: 99px; font-size: 12px; pointer-events: none;
+  opacity: 0; transition: opacity .25s; white-space: nowrap; z-index: 601;
+}
+
 /* 전체화면 모드 */
 .map-fullscreen {
   position: fixed !important; inset: 0 !important;
@@ -878,20 +901,89 @@ function initFormMap() {
   });
 }
 
+/* ──── Map Gesture Handling ──── */
+function setupMapGesture(container, mapL) {
+  if (!container || !mapL) return;
+
+  // ── PC: 스크롤 휠 줌은 클릭 후에만 활성화 ──
+  mapL.scrollWheelZoom.disable();
+
+  const scrollHint = document.createElement('div');
+  scrollHint.className = 'map-scroll-hint';
+  scrollHint.textContent = '🖱 클릭 후 스크롤로 확대/축소';
+  container.appendChild(scrollHint);
+
+  let scrollHintTimer;
+  container.addEventListener('wheel', () => {
+    if (!mapL.scrollWheelZoom._enabled) {
+      scrollHint.style.opacity = '1';
+      clearTimeout(scrollHintTimer);
+      scrollHintTimer = setTimeout(() => scrollHint.style.opacity = '0', 1800);
+    }
+  }, { passive: true });
+
+  container.addEventListener('click', () => {
+    mapL.scrollWheelZoom.enable();
+    scrollHint.style.opacity = '0';
+  });
+  container.addEventListener('mouseleave', () => {
+    mapL.scrollWheelZoom.disable();
+  });
+
+  // ── 모바일: 한 손가락 = 페이지 스크롤, 두 손가락 = 지도 조작 ──
+  const overlay = document.createElement('div');
+  overlay.className = 'map-gesture-overlay';
+
+  const hint = document.createElement('div');
+  hint.className = 'map-gesture-hint';
+  hint.innerHTML = '👆 두 손가락으로<br>지도를 조작하세요';
+  overlay.appendChild(hint);
+  container.appendChild(overlay);
+
+  let hintTimer, restoreTimer;
+
+  overlay.addEventListener('touchstart', e => {
+    if (e.touches.length >= 2) {
+      // 두 손가락: 오버레이 비활성화 → Leaflet이 터치 수신
+      overlay.style.pointerEvents = 'none';
+      hint.style.opacity = '0';
+    } else {
+      // 한 손가락: 힌트 표시, 오버레이가 터치 가로채서 페이지 스크롤
+      hint.style.opacity = '1';
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(() => { hint.style.opacity = '0'; }, 1500);
+    }
+  }, { passive: true });
+
+  // 터치 끝나면 오버레이 복원 (약간 딜레이 — 연속 두 손가락 동작 허용)
+  container.addEventListener('touchend', () => {
+    clearTimeout(restoreTimer);
+    restoreTimer = setTimeout(() => {
+      if (!_fsState.main && !_fsState.class) { // 전체화면 아닐 때만
+        overlay.style.pointerEvents = 'auto';
+      } else {
+        overlay.style.pointerEvents = 'auto';
+      }
+    }, 300);
+  }, { passive: true });
+}
+
 function initMainMap() {
   if (mainMapL) return;
-  mainMapL = L.map('mainMapContainer', { zoomControl: true, attributionControl: false })
+  mainMapL = L.map('mainMapContainer', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 })
     .addTo(mainMapL);
+  setupMapGesture(document.getElementById('mainMapContainer'), mainMapL);
 }
 
 function initClassMap() {
   if (classMapL) return;
-  classMapL = L.map('classMapContainer', { zoomControl: true, attributionControl: false })
+  classMapL = L.map('classMapContainer', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 })
     .addTo(classMapL);
+  setupMapGesture(document.getElementById('classMapContainer'), classMapL);
 }
 
 function setFormPin(lat, lng) {
@@ -1263,16 +1355,22 @@ function toggleMapFs(which) {
   const btn         = document.getElementById(btnId);
   _fsState[which]   = !_fsState[which];
 
+  // 제스처 오버레이 — 전체화면에서도 동작 유지
+  const overlay = el.querySelector('.map-gesture-overlay');
+
   if (_fsState[which]) {
     el.classList.add('map-fullscreen');
     btn.textContent = '✕';
     btn.title = '닫기';
     document.body.style.overflow = 'hidden';
+    // 전체화면에서 오버레이는 계속 살아있음 (z-index 600 < fullscreen 8000 내부)
+    if (overlay) overlay.style.pointerEvents = 'auto';
   } else {
     el.classList.remove('map-fullscreen');
     btn.textContent = '⛶';
     btn.title = '전체화면';
     document.body.style.overflow = '';
+    if (overlay) overlay.style.pointerEvents = 'auto';
   }
   // 크기 변경 후 Leaflet 재계산
   setTimeout(() => { if (mapL) mapL.invalidateSize(); }, 50);
