@@ -390,6 +390,31 @@ textarea.inp { height: 80px; resize: none; }
 .cls-color-18 { background: #AB47BC; }
 .cls-color-19 { background: #26C6DA; }
 
+/* ───── Button Primitives ───── */
+.btn-pri {
+  padding: 10px 18px; border-radius: var(--r); font-size: 14px; font-weight: 700;
+  background: var(--pri); color: #fff; border: none; cursor: pointer;
+}
+.btn-pri:active { opacity: .85; }
+.btn-sec {
+  padding: 10px 18px; border-radius: var(--r); font-size: 14px; font-weight: 600;
+  background: var(--surf2); color: var(--txt); border: 1.5px solid var(--bdr); cursor: pointer;
+}
+.btn-sec:active { opacity: .8; }
+
+/* ───── Group Filter Row ───── */
+.group-filter-row {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; padding: 0 2px;
+}
+
+/* ───── All-class breakdown ───── */
+.class-breakdown { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.class-breakdown-chip {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--surf2); border-radius: 99px; padding: 3px 10px;
+  font-size: 12px; color: var(--txt);
+}
+
 /* ───── Leaflet overrides ───── */
 .leaflet-container { font-family: inherit; }
 .leaflet-control-zoom a { color: var(--txt) !important; background: var(--surf) !important; border-color: var(--bdr) !important; }
@@ -565,6 +590,7 @@ const FB_CONFIG = {
           <label>학급 선택:</label>
           <select class="inp" id="classViewSel" style="max-width:180px;"></select>
         </div>
+        <div class="group-filter-row" id="groupFilterRow"></div>
         <div class="class-map-container" id="classMapContainer" style="height:260px;"></div>
         <div class="stats-bar" id="statsBar"></div>
         <div class="obs-list" id="obsList"></div>
@@ -605,7 +631,7 @@ const FB_CONFIG = {
 
 
 <!-- Admin Login Modal -->
-<div class="modal-bg" id="adminLoginBg" style="display:none;">
+<div class="modal-bg" id="adminLoginBg">
   <div class="modal" id="adminLoginModal" style="max-width:320px;">
     <h3 style="margin-bottom:16px;color:var(--pri);">🔐 관리자 로그인</h3>
     <input class="inp" id="adminPwInput" type="password" placeholder="관리자 비밀번호" style="margin-bottom:12px;">
@@ -618,7 +644,7 @@ const FB_CONFIG = {
 </div>
 
 <!-- Edit Modal -->
-<div class="modal-bg" id="editModalBg" style="display:none;">
+<div class="modal-bg" id="editModalBg">
   <div class="modal" id="editModal" style="max-width:420px;">
     <h3 style="margin-bottom:16px;color:var(--pri);">✏️ 기록 수정</h3>
     <input class="inp" id="editSpecies" type="text" placeholder="생물 이름" style="margin-bottom:10px;">
@@ -700,6 +726,7 @@ let themeMode = localStorage.getItem('theme') || 'auto';
 let adminMode = false;
 const ADMIN_PW = '1990';
 let editingId = null;
+let currentGroupFilter = 'all';
 
 /* ──── Boot ──── */
 window.addEventListener('DOMContentLoaded', () => {
@@ -813,16 +840,24 @@ function autoSelectZone(lat, lng) {
 function buildClassSelect() {
   const sel = document.getElementById('selClass');
   const viewSel = document.getElementById('classViewSel');
+
+  // 기록하기 탭: 1~11반
   for (let c = 1; c <= 11; c++) {
-    const label = `1학년 ${c}반`;
-    sel.appendChild(new Option(label, label));
-    viewSel.appendChild(new Option(label, label));
+    sel.appendChild(new Option(`1학년 ${c}반`, `1학년 ${c}반`));
   }
+
+  // 학급별 탭: 전체 학년 + 1~11반
+  viewSel.appendChild(new Option('🌿 전체 학년', '__all__'));
+  for (let c = 1; c <= 11; c++) {
+    viewSel.appendChild(new Option(`1학년 ${c}반`, `1학년 ${c}반`));
+  }
+
   viewSel.addEventListener('change', () => {
     currentClassView = viewSel.value;
+    currentGroupFilter = 'all'; // 반 바꾸면 조 필터 초기화
     renderClassView();
   });
-  currentClassView = viewSel.value;
+  currentClassView = viewSel.value; // '__all__'
 }
 
 /* ──── Zone Chips ──── */
@@ -1142,12 +1177,25 @@ function renderLegend() {
 
 /* ──── Class View ──── */
 function renderClassView() {
-  const cls = document.getElementById('classViewSel')?.value || '';
+  const viewSel = document.getElementById('classViewSel');
+  const cls = viewSel?.value || '__all__';
   currentClassView = cls;
+  const isAll = cls === '__all__';
 
-  const clsObs = Object.entries(observations).filter(([, o]) => o.class === cls);
+  // 기반 관측 (조 필터 전 — 조 버튼 빌드에 사용)
+  const baseObs = isAll
+    ? Object.entries(observations)
+    : Object.entries(observations).filter(([, o]) => o.class === cls);
 
-  // Map
+  // 조 필터 적용
+  const clsObs = currentGroupFilter === 'all'
+    ? baseObs
+    : baseObs.filter(([, o]) => o.group === currentGroupFilter);
+
+  // 조 필터 버튼 렌더
+  renderGroupFilter(baseObs);
+
+  // ── Map ──
   if (classMapL) {
     obsMarkersClass.forEach(m => classMapL.removeLayer(m));
     obsMarkersClass = [];
@@ -1157,35 +1205,55 @@ function renderClassView() {
       if (!lat || !lng) return;
       const color = classColor(obs.class);
       const zone = ZONES.find(z => z.id === obs.location);
+      const label = `${zone ? zone.em : '📍'} ${obs.species}${isAll ? ' (' + obs.class + ')' : ''}`;
       const m = L.circleMarker([lat, lng], {
         radius: 9, color, fillColor: color, fillOpacity: 0.85, weight: 2
       }).addTo(classMapL);
       m.on('click', () => openModal(id, obs));
-      m.bindTooltip(`${zone ? zone.em : '📍'} ${obs.species}`, { direction: 'top' });
+      m.bindTooltip(label, { direction: 'top' });
       obsMarkersClass.push(m);
     });
     classMapL.invalidateSize();
   }
 
-  // Stats
+  // ── Stats ──
   const statsBar = document.getElementById('statsBar');
   if (statsBar) {
     const uniqueSpecies = [...new Set(clsObs.map(([,o]) => o.species))];
     const uniqueZones   = [...new Set(clsObs.map(([,o]) => o.location))];
+    const title = isAll ? '🌿 전체 학년' : cls;
+
+    // 전체 보기일 때 반별 건수 소형 배지
+    let breakdown = '';
+    if (isAll) {
+      const byClass = {};
+      clsObs.forEach(([, o]) => { byClass[o.class] = (byClass[o.class] || 0) + 1; });
+      const sorted = Object.entries(byClass).sort(([a],[b]) => a.localeCompare(b, 'ko'));
+      if (sorted.length) {
+        breakdown = `<div class="class-breakdown">` +
+          sorted.map(([c, n]) =>
+            `<div class="class-breakdown-chip">
+               <span style="width:8px;height:8px;border-radius:50%;background:${classColor(c)};display:inline-block;flex-shrink:0;"></span>
+               ${c} <b>${n}</b>건
+             </div>`).join('') +
+          `</div>`;
+      }
+    }
+
     statsBar.innerHTML = `
-      <div class="stats-title">${cls || '— '} 통계</div>
+      <div class="stats-title">${title} 통계</div>
       <div class="stats-grid">
         <div class="stat-item"><div class="stat-num">${clsObs.length}</div><div class="stat-label">총 관측 수</div></div>
         <div class="stat-item"><div class="stat-num">${uniqueSpecies.length}</div><div class="stat-label">종 수</div></div>
         <div class="stat-item"><div class="stat-num">${uniqueZones.length}</div><div class="stat-label">탐사 구역</div></div>
-      </div>`;
+      </div>${breakdown}`;
   }
 
-  // List
+  // ── List ──
   const list = document.getElementById('obsList');
   if (!list) return;
   if (!clsObs.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>아직 이 학급의 기록이 없어요</p></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>아직 기록이 없어요</p></div>`;
     return;
   }
   list.innerHTML = '';
@@ -1193,24 +1261,49 @@ function renderClassView() {
     const zone = ZONES.find(z => z.id === obs.location);
     const card = document.createElement('div');
     card.className = 'obs-card';
+    const metaLine = isAll
+      ? `${obs.class} · ${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''} · ${obs.location}`
+      : `${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''} · ${obs.location}`;
+    const safeSpecies = (obs.species || '').replace(/'/g, "\\'");
     card.innerHTML = `
       ${obs.photo
         ? `<img class="obs-card-img" src="${obs.photo}" alt="${obs.species}">`
         : `<div class="obs-card-img-placeholder">${zone ? zone.em : '📍'}</div>`}
       <div class="obs-card-body">
         <div class="obs-card-species">${obs.species}</div>
-        <div class="obs-card-meta">${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''} · ${obs.location}</div>
+        <div class="obs-card-meta">${metaLine}</div>
         ${obs.notes ? `<div class="obs-card-notes">${obs.notes}</div>` : ''}
         <div class="obs-card-time">${formatTime(obs.timestamp)}</div>
       </div>
-      <button class="obs-card-del" onclick="deleteObs('${id}')" title="삭제">🗑️</button>`;
+      ${adminMode ? `<button class="obs-card-del" onclick="confirmDelete('${id}','${safeSpecies}')" title="삭제 (관리자)">🗑️</button>` : ''}`;
     card.querySelector('.obs-card-body').onclick = () => openModal(id, obs);
     list.appendChild(card);
   });
 }
 
+/* ──── Group Filter Chips ──── */
+function renderGroupFilter(baseObs) {
+  const row = document.getElementById('groupFilterRow');
+  if (!row) return;
+  const groups = [...new Set(baseObs.map(([, o]) => o.group).filter(Boolean))].sort();
+  if (groups.length <= 1) { row.innerHTML = ''; return; }
+  const all = ['all', ...groups];
+  row.innerHTML = all.map(g => {
+    const label = g === 'all' ? '전체 조' : g;
+    const active = currentGroupFilter === g;
+    return `<button class="filter-chip${active ? ' active' : ''}" onclick="setGroupFilter('${g}')">${label}</button>`;
+  }).join('');
+}
+
+function setGroupFilter(g) {
+  currentGroupFilter = g;
+  renderClassView();
+}
+window.setGroupFilter = setGroupFilter;
+
 /* ──── Delete ──── */
 async function deleteObs(id) {
+  if (!adminMode) { toast('🔒 관리자만 삭제할 수 있어요'); return; }
   if (!confirm('이 기록을 삭제할까요?')) return;
   try {
     await obsRef.child(id).remove();
@@ -1254,11 +1347,18 @@ function switchTab(tabId) {
 
   if (tabId === 'tab-map') {
     initMainMap();
-    setTimeout(() => { if (mainMapL) { mainMapL.invalidateSize(); renderMapPins(); } }, 120);
+    setTimeout(() => { if (mainMapL) { mainMapL.invalidateSize(); renderMapPins(); } }, 150);
   }
   if (tabId === 'tab-class') {
     initClassMap();
-    setTimeout(() => { if (classMapL) { classMapL.invalidateSize(); renderClassView(); } }, 120);
+    setTimeout(() => {
+      if (classMapL) {
+        classMapL.invalidateSize();
+        renderClassView();
+        // 타일 로딩 후 한 번 더 확인
+        setTimeout(() => { classMapL.invalidateSize(); }, 500);
+      }
+    }, 150);
   }
 }
 
@@ -1320,10 +1420,11 @@ function toggleAdminLogin() {
     document.getElementById('app').classList.remove('admin-active');
     document.getElementById('adminBtn').textContent = '🔒';
     toast('🔒 관리자 모드 해제');
+    renderClassView(); // 삭제 버튼 숨김
   } else {
     document.getElementById('adminPwInput').value = '';
     document.getElementById('adminPwError').style.display = 'none';
-    document.getElementById('adminLoginBg').style.display = 'flex';
+    document.getElementById('adminLoginBg').classList.add('open');
     setTimeout(() => document.getElementById('adminPwInput').focus(), 100);
   }
 }
@@ -1332,10 +1433,11 @@ function tryAdminLogin() {
   const pw = document.getElementById('adminPwInput').value;
   if (pw === ADMIN_PW) {
     adminMode = true;
-    document.getElementById('adminLoginBg').style.display = 'none';
+    document.getElementById('adminLoginBg').classList.remove('open');
     document.getElementById('app').classList.add('admin-active');
     document.getElementById('adminBtn').textContent = '🔓';
     toast('🔓 관리자 모드 활성화');
+    renderClassView(); // 삭제 버튼 표시
   } else {
     document.getElementById('adminPwError').style.display = 'block';
   }
@@ -1359,7 +1461,7 @@ function openEditModal(id) {
     sel.appendChild(opt);
   });
   document.getElementById('modalBg').classList.remove('open');
-  document.getElementById('editModalBg').style.display = 'flex';
+  document.getElementById('editModalBg').classList.add('open');
 }
 
 function saveEdit() {
@@ -1371,13 +1473,14 @@ function saveEdit() {
   obsRef.child(editingId).update({ species, notes, location }, err => {
     if (err) { toast('❌ 저장 실패: ' + err.message); return; }
     toast('✅ 수정 완료');
-    document.getElementById('editModalBg').style.display = 'none';
+    document.getElementById('editModalBg').classList.remove('open');
     editingId = null;
   });
 }
 
 /* ──── Delete Record ──── */
 function confirmDelete(id, species) {
+  if (!adminMode) { toast('🔒 관리자만 삭제할 수 있어요'); return; }
   if (!confirm(`"${species}" 기록을 삭제할까요?`)) return;
   document.getElementById('modalBg').classList.remove('open');
   obsRef.child(id).remove(err => {
@@ -1427,7 +1530,7 @@ function bindUI() {
   // Admin
   document.getElementById('adminBtn').addEventListener('click', toggleAdminLogin);
   document.getElementById('adminLoginCancel').addEventListener('click', () => {
-    document.getElementById('adminLoginBg').style.display = 'none';
+    document.getElementById('adminLoginBg').classList.remove('open');
   });
   document.getElementById('adminLoginOk').addEventListener('click', tryAdminLogin);
   document.getElementById('adminPwInput').addEventListener('keydown', e => {
@@ -1436,7 +1539,7 @@ function bindUI() {
 
   // Edit modal
   document.getElementById('editCancel').addEventListener('click', () => {
-    document.getElementById('editModalBg').style.display = 'none';
+    document.getElementById('editModalBg').classList.remove('open');
   });
   document.getElementById('editSave').addEventListener('click', saveEdit);
 
