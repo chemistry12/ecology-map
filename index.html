@@ -148,7 +148,7 @@ img { max-width: 100%; }
 .nav-btn.active { color: var(--pri); }
 
 /* ───── Form Tab ───── */
-.form-wrap { padding: 16px; max-width: 560px; margin: 0 auto; }
+.form-wrap { padding: 16px; padding-bottom: calc(var(--nav-h) + 20px); max-width: 560px; margin: 0 auto; }
 .form-section { margin-bottom: 20px; }
 .form-section label { display: block; font-size: 13px; font-weight: 600; color: var(--txt2); margin-bottom: 6px; }
 .inp, select.inp, textarea.inp {
@@ -530,6 +530,7 @@ const FB_CONFIG = {
           </div>
         </div>
 
+        <div id="formError" style="display:none;background:#FEE;color:#C00;border:1px solid #FBCACA;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;margin-bottom:10px;text-align:center;"></div>
         <button class="submit-btn" id="submitBtn">📍 기록 저장하기</button>
         <div style="height:20px;"></div>
       </div>
@@ -934,18 +935,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 영생고등학교, 수원시 장안구 서부로2198번길 22
-  // 지도 이미지 경계 위경도 (오차 있을 수 있음 — 핀 위치 안맞으면 조정)
-  const MAP_BOUNDS = {
-    north: 37.2975, south: 37.2910,
-    west:  126.9685, east:  126.9775
-  };
-  function gpsToMapXY(lat, lon) {
-    const x = (lon - MAP_BOUNDS.west) / (MAP_BOUNDS.east - MAP_BOUNDS.west);
-    const y = (MAP_BOUNDS.north - lat) / (MAP_BOUNDS.north - MAP_BOUNDS.south);
-    return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
-  }
-
   photoInput.addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1006,11 +995,19 @@ async function handleSubmit() {
   const sp    = document.getElementById('inpSpecies').value.trim();
   const notes = document.getElementById('inpNotes').value.trim();
 
-  if (!cls)  { toast('⚠️ 학년·반을 선택하세요'); return; }
-  if (!grp)  { toast('⚠️ 조를 선택하세요'); return; }
-  if (!name) { toast('⚠️ 이름을 입력하세요'); return; }
-  if (!sp)   { toast('⚠️ 생물 이름을 입력하세요'); return; }
-  if (!selectedZone && pinX === null) { toast('⚠️ 지도에서 발견 위치를 핀으로 표시하세요'); return; }
+  function showErr(msg) {
+    const el = document.getElementById('formError');
+    if (el) { el.textContent = msg; el.style.display = 'block'; setTimeout(()=>el.style.display='none', 4000); }
+    toast(msg);
+  }
+  const el2 = document.getElementById('formError');
+  if (el2) el2.style.display = 'none';
+
+  if (!cls)  { showErr('⚠️ 학년·반을 선택하세요'); return; }
+  if (!grp)  { showErr('⚠️ 조를 선택하세요'); return; }
+  if (!name) { showErr('⚠️ 이름을 입력하세요'); return; }
+  if (!sp)   { showErr('⚠️ 생물 이름을 입력하세요'); return; }
+  if (!selectedZone && pinX === null) { showErr('⚠️ 발견 위치를 선택하거나 지도에 핀을 찍으세요'); return; }
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
@@ -1282,6 +1279,17 @@ function toast(msg) {
 }
 
 
+
+// 영생고등학교 지도 경계 위경도
+const MAP_BOUNDS = {
+  north: 37.2975, south: 37.2910,
+  west:  126.9685, east:  126.9775
+};
+function gpsToMapXY(lat, lon) {
+  const x = (lon - MAP_BOUNDS.west) / (MAP_BOUNDS.east - MAP_BOUNDS.west);
+  const y = (MAP_BOUNDS.north - lat) / (MAP_BOUNDS.north - MAP_BOUNDS.south);
+  return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+}
 
 /* ──── GPS Auto Pin ──── */
 function gpsAutoPin() {
