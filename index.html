@@ -516,6 +516,7 @@ const FB_CONFIG = {
   <div class="topbar">
     <h1>🌿 영생고 생태지도</h1>
     <button class="icon-btn" id="adminBtn" title="관리자 모드">🔒</button>
+    <button class="icon-btn" id="csvBtn" title="CSV 내보내기 (관리자)" style="display:none;" onclick="exportCSV()">📥</button>
     <button class="icon-btn" id="themeBtn" title="다크모드 전환">🌙</button>
     <button class="icon-btn" id="refreshBtn" title="새로고침">🔄</button>
   </div>
@@ -580,6 +581,9 @@ const FB_CONFIG = {
             <button type="button" class="btn-gps" id="gpsBtn">📡 현재 위치</button>
           </div>
           <div id="autoZoneDisplay" style="min-height:24px;margin:6px 0 8px;"></div>
+          <div id="formMapTools" style="display:none;margin-bottom:6px;">
+            <button type="button" class="btn-sec" style="font-size:12px;padding:5px 12px;" onclick="resetFormMapToSchool()">🏫 학교로 돌아가기</button>
+          </div>
           <div id="formMap" style="height:250px;border-radius:var(--r);overflow:hidden;border:1.5px solid var(--bdr);"></div>
         </div>
 
@@ -1104,6 +1108,8 @@ function resetForm() {
   renderPhotoArea();
   const disp = document.getElementById('autoZoneDisplay');
   if (disp) disp.innerHTML = '';
+  const tools = document.getElementById('formMapTools');
+  if (tools) tools.style.display = 'none';
 }
 
 /* ──── Map Rendering ──── */
@@ -1430,12 +1436,17 @@ function gpsAutoPin() {
   navigator.geolocation.getCurrentPosition(pos => {
     btn.textContent = '📡 현재 위치';
     btn.disabled = false;
-    const { latitude: lat, longitude: lon } = pos.coords;
+    const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+    if (accuracy > 80) {
+      toast(`⚠️ GPS 신호 약함 (오차 약 ${Math.round(accuracy)}m)\n야외에서 다시 시도하거나 지도를 직접 탭하세요`);
+      return;
+    }
     if (formMapL) {
       setFormPin(lat, lon);
       formMapL.flyTo([lat, lon], 19, { duration: 0.8 });
       autoSelectZone(lat, lon);
-      toast('📍 현재 GPS 위치로 핀 설정됨');
+      document.getElementById('formMapTools').style.display = 'block';
+      toast(`📍 현재 위치로 핀 설정됨 (오차 ±${Math.round(accuracy)}m)`);
     }
   }, err => {
     btn.textContent = '📡 현재 위치';
@@ -1444,12 +1455,18 @@ function gpsAutoPin() {
   }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
+function resetFormMapToSchool() {
+  if (!formMapL) return;
+  formMapL.flyTo(SCHOOL_CENTER, SCHOOL_ZOOM, { duration: 0.8 });
+}
+
 /* ──── Admin Mode ──── */
 function toggleAdminLogin() {
   if (adminMode) {
     adminMode = false;
     document.getElementById('app').classList.remove('admin-active');
     document.getElementById('adminBtn').textContent = '🔒';
+    document.getElementById('csvBtn').style.display = 'none';
     toast('🔒 관리자 모드 해제');
     renderClassView(); // 삭제 버튼 숨김
   } else {
@@ -1467,12 +1484,46 @@ function tryAdminLogin() {
     document.getElementById('adminLoginBg').classList.remove('open');
     document.getElementById('app').classList.add('admin-active');
     document.getElementById('adminBtn').textContent = '🔓';
+    document.getElementById('csvBtn').style.display = '';
     toast('🔓 관리자 모드 활성화');
     renderClassView(); // 삭제 버튼 표시
   } else {
     document.getElementById('adminPwError').style.display = 'block';
   }
 }
+
+/* ──── CSV Export ──── */
+function exportCSV() {
+  if (!adminMode) { toast('🔒 관리자만 내보낼 수 있어요'); return; }
+  const rows = Object.entries(observations || {});
+  if (!rows.length) { toast('내보낼 기록이 없습니다'); return; }
+
+  const header = ['ID','반','이름','조','생물명','메모','장소','위도','경도','날짜'];
+  const lines = [header.join(',')];
+
+  rows.forEach(([id, o]) => {
+    const lat  = o.lat  != null ? o.lat  : (o.mapY != null ? (37.3051 - o.mapY * 0.0014) : '');
+    const lng  = o.lng  != null ? o.lng  : (o.mapX != null ? (126.9736 + o.mapX * 0.0024) : '');
+    const date = o.ts   ? new Date(o.ts).toLocaleDateString('ko-KR') : '';
+    const esc  = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+    lines.push([
+      esc(id), esc(o.class), esc(o.name), esc(o.group),
+      esc(o.species), esc(o.notes), esc(o.location),
+      lat, lng, esc(date)
+    ].join(','));
+  });
+
+  const bom  = '﻿'; // Excel 한글 깨짐 방지
+  const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `영생고_생태기록_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`📥 ${rows.length}건 CSV 내보내기 완료`);
+}
+window.exportCSV = exportCSV;
 
 /* ──── Edit Record ──── */
 function openEditModal(id) {
@@ -1629,6 +1680,7 @@ function bindUI() {
 window.deleteObs = deleteObs;
 window.clearPhoto = clearPhoto;
 window.openEditModal = openEditModal;
+window.resetFormMapToSchool = resetFormMapToSchool;
 window.confirmDelete = confirmDelete;
 </script>
 </body>
