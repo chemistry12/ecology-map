@@ -474,6 +474,7 @@ const FB_CONFIG = {
   <!-- Top Bar -->
   <div class="topbar">
     <h1>🌿 영생고 생태지도</h1>
+    <button class="icon-btn" id="adminBtn" title="관리자 모드">🔒</button>
     <button class="icon-btn" id="themeBtn" title="다크모드 전환">🌙</button>
     <button class="icon-btn" id="refreshBtn" title="새로고침">🔄</button>
   </div>
@@ -664,16 +665,16 @@ const FB_CONFIG = {
 
 /* ──── Constants ──── */
 const ZONES = [
-  { id: '정문',         em: '🚪', lat: 37.2918, lng: 126.9722 },
-  { id: '본관',         em: '🏫', lat: 37.2956, lng: 126.9702 },
-  { id: '급식동',       em: '🍽️', lat: 37.2966, lng: 126.9704 },
-  { id: '대강당',       em: '🎭', lat: 37.2961, lng: 126.9733 },
-  { id: '100주년기념관', em: '🏛️', lat: 37.2946, lng: 126.9753 },
-  { id: '운동장',       em: '⚽', lat: 37.2938, lng: 126.9731 },
-  { id: '농구코트',     em: '🏀', lat: 37.2939, lng: 126.9711 },
-  { id: '트랙',         em: '🏃', lat: 37.2939, lng: 126.9720 },
+  { id: '정문',         em: '🚪', lat: 37.303875, lng: 126.974584 },
+  { id: '본관',         em: '🏫', lat: 37.304680, lng: 126.974044 },
+  { id: '급식동',       em: '🍽️', lat: 37.304897, lng: 126.974104 },
+  { id: '대강당',       em: '🎭', lat: 37.304792, lng: 126.974872 },
+  { id: '100주년기념관', em: '🏛️', lat: 37.304484, lng: 126.975424 },
+  { id: '운동장',       em: '⚽', lat: 37.304309, lng: 126.974824 },
+  { id: '농구코트',     em: '🏀', lat: 37.304316, lng: 126.974284 },
+  { id: '트랙',         em: '🏃', lat: 37.304316, lng: 126.974536 },
 ];
-const SCHOOL_CENTER = [37.2942, 126.9725];
+const SCHOOL_CENTER = [37.3044, 126.9748];
 const SCHOOL_ZOOM = 18;
 
 /* Class color palette (CSS class indices) */
@@ -1064,8 +1065,8 @@ function renderMapPins() {
 
   Object.entries(observations).forEach(([id, obs]) => {
     if (activeFilter !== 'all' && obs.class !== activeFilter) return;
-    const lat = obs.lat || obs.mapY && (37.2975 - obs.mapY * 0.0065);
-    const lng = obs.lng || obs.mapX && (126.9685 + obs.mapX * 0.009);
+    const lat = obs.lat || (obs.mapY != null && (37.3051 - obs.mapY * 0.0014));
+    const lng = obs.lng || (obs.mapX != null && (126.9736 + obs.mapX * 0.0024));
     if (!lat || !lng) return;
     const color = classColor(obs.class);
     const zone = ZONES.find(z => z.id === obs.location);
@@ -1151,8 +1152,8 @@ function renderClassView() {
     obsMarkersClass.forEach(m => classMapL.removeLayer(m));
     obsMarkersClass = [];
     clsObs.forEach(([id, obs]) => {
-      const lat = obs.lat || obs.mapY && (37.2975 - obs.mapY * 0.0065);
-      const lng = obs.lng || obs.mapX && (126.9685 + obs.mapX * 0.009);
+      const lat = obs.lat || (obs.mapY != null && (37.3051 - obs.mapY * 0.0014));
+      const lng = obs.lng || (obs.mapX != null && (126.9736 + obs.mapX * 0.0024));
       if (!lat || !lng) return;
       const color = classColor(obs.class);
       const zone = ZONES.find(z => z.id === obs.location);
