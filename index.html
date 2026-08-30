@@ -278,6 +278,22 @@ textarea.inp { height: 80px; resize: none; }
 .class-map-container { position: relative; border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 12px; }
 .class-map-container svg { display: block; width: 100%; height: auto; }
 
+/* 자동 구역 표시 */
+.auto-zone-badge {
+  font-size: 13px; color: var(--pri); font-weight: 600;
+  background: var(--surf2); border-radius: 99px; padding: 4px 12px;
+  display: inline-block; margin-top: 6px; border: 1px solid var(--bdr);
+}
+
+/* ── 반응형: PC에서 지도 크게 ── */
+@media (min-width: 768px) {
+  #formMap { height: 380px !important; }
+  #mainMapContainer { height: 520px !important; }
+  #classMapContainer { height: 460px !important; }
+  .class-wrap, .map-wrap { max-width: 900px; margin: 0 auto; }
+  .form-wrap { max-width: 680px; }
+}
+
 .stats-bar {
   background: var(--surf); border-radius: var(--r); padding: 14px 16px;
   margin-bottom: 12px; box-shadow: var(--shadow);
@@ -557,11 +573,14 @@ const FB_CONFIG = {
           <textarea class="inp" id="inpNotes" placeholder="발견 상황, 특이사항 등"></textarea>
         </div>
 
-        <!-- 발견 장소 — Chip -->
+        <!-- 발견 장소 — 지도 핀 -->
         <div class="form-section">
-          <div style="display:flex;align-items:center;justify-content:space-between;"><label>발견 장소 <span style="font-weight:400;color:var(--txt2)">(구역 또는 지도 핀)</span></label><button type="button" class="btn-gps" id="gpsBtn">📡 현재 위치</button></div>
-          <div class="chips" id="zoneChips" style="margin-bottom:10px;"></div>
-          <div id="formMap" style="height:250px;border-radius:var(--r);overflow:hidden;border:1.5px solid var(--bdr);margin-top:8px;"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <label>발견 장소 <span style="font-weight:400;color:var(--txt2)">(지도를 탭하여 핀 설정)</span></label>
+            <button type="button" class="btn-gps" id="gpsBtn">📡 현재 위치</button>
+          </div>
+          <div id="autoZoneDisplay" style="min-height:24px;margin:6px 0 8px;"></div>
+          <div id="formMap" style="height:250px;border-radius:var(--r);overflow:hidden;border:1.5px solid var(--bdr);"></div>
         </div>
 
         <div id="formError" style="display:none;background:#FEE;color:#C00;border:1px solid #FBCACA;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;margin-bottom:10px;text-align:center;"></div>
@@ -743,7 +762,6 @@ window.addEventListener('DOMContentLoaded', () => {
 function initApp() {
   applyTheme();
   buildClassSelect();
-  buildZoneChips();
   initFormMap();
   initFirebase();
   bindUI();
@@ -768,6 +786,7 @@ function initFirebase() {
 function onData() {
   renderMapPins();
   renderClassView();
+  if (classMapL) classMapL.invalidateSize();
 }
 
 /* ──── Leaflet Map Init ──── */
@@ -828,11 +847,13 @@ function autoSelectZone(lat, lng) {
     const d = Math.hypot(z.lat - lat, z.lng - lng);
     if (d < minD) { minD = d; nearest = z; }
   });
+  const disp = document.getElementById('autoZoneDisplay');
   if (nearest && minD < 0.0005) {
     selectedZone = nearest.id;
-    document.querySelectorAll('.chip').forEach(c => {
-      c.classList.toggle('active', c.dataset.zone === nearest.id);
-    });
+    if (disp) disp.innerHTML = `<span class="auto-zone-badge">${nearest.em} ${nearest.id} 근처</span>`;
+  } else {
+    selectedZone = null;
+    if (disp) disp.innerHTML = `<span class="auto-zone-badge" style="color:var(--txt2);">📍 핀 위치 저장됨</span>`;
   }
 }
 
@@ -1081,7 +1102,8 @@ function resetForm() {
   photoData = null;
   document.getElementById('photoInput').value = '';
   renderPhotoArea();
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  const disp = document.getElementById('autoZoneDisplay');
+  if (disp) disp.innerHTML = '';
 }
 
 /* ──── Map Rendering ──── */
@@ -1207,13 +1229,22 @@ function renderClassView() {
       const zone = ZONES.find(z => z.id === obs.location);
       const label = `${zone ? zone.em : '📍'} ${obs.species}${isAll ? ' (' + obs.class + ')' : ''}`;
       const m = L.circleMarker([lat, lng], {
-        radius: 9, color, fillColor: color, fillOpacity: 0.85, weight: 2
+        radius: 11, color, fillColor: color, fillOpacity: 0.9, weight: 2.5
       }).addTo(classMapL);
       m.on('click', () => openModal(id, obs));
-      m.bindTooltip(label, { direction: 'top' });
+      m.bindTooltip(label, { direction: 'top', permanent: false });
       obsMarkersClass.push(m);
     });
     classMapL.invalidateSize();
+    // 마커가 있으면 항상 보이도록 fitBounds, 없으면 학교 기본 뷰
+    if (obsMarkersClass.length) {
+      try {
+        const grp = L.featureGroup(obsMarkersClass);
+        classMapL.fitBounds(grp.getBounds().pad(0.25), { maxZoom: 19 });
+      } catch(e) { classMapL.setView(SCHOOL_CENTER, SCHOOL_ZOOM); }
+    } else {
+      classMapL.setView(SCHOOL_CENTER, SCHOOL_ZOOM);
+    }
   }
 
   // ── Stats ──
