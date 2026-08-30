@@ -880,6 +880,7 @@ function buildClassSelect() {
   viewSel.addEventListener('change', () => {
     currentClassView = viewSel.value;
     currentGroupFilter = 'all'; // 반 바꾸면 조 필터 초기화
+    if (classMapL) classMapL.invalidateSize();
     renderClassView();
   });
   currentClassView = viewSel.value; // '__all__'
@@ -1228,29 +1229,52 @@ function renderClassView() {
     obsMarkersClass.forEach(m => classMapL.removeLayer(m));
     obsMarkersClass = [];
     clsObs.forEach(([id, obs]) => {
-      const lat = obs.lat || (obs.mapY != null && (37.3051 - obs.mapY * 0.0014));
-      const lng = obs.lng || (obs.mapX != null && (126.9736 + obs.mapX * 0.0024));
+      const lat = obs.lat || (obs.mapY != null ? (37.3051 - obs.mapY * 0.0014) : null);
+      const lng = obs.lng || (obs.mapX != null ? (126.9736 + obs.mapX * 0.0024) : null);
       if (!lat || !lng) return;
       const color = classColor(obs.class);
       const zone = ZONES.find(z => z.id === obs.location);
       const label = `${zone ? zone.em : '📍'} ${obs.species}${isAll ? ' (' + obs.class + ')' : ''}`;
-      const m = L.circleMarker([lat, lng], {
-        radius: 11, color, fillColor: color, fillOpacity: 0.9, weight: 2.5
-      }).addTo(classMapL);
+      let m;
+      if (obs.photo) {
+        const icon = L.divIcon({
+          html: `<div style="width:36px;height:44px;position:relative;filter:drop-shadow(0 3px 5px rgba(0,0,0,.4));">
+            <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
+              <path d="M18 0C8.059 0 0 8.059 0 18C0 28 18 44 18 44C18 44 36 28 36 18C36 8.059 27.941 0 18 0Z" fill="${color}"/>
+              <circle cx="18" cy="18" r="14" fill="white"/>
+            </svg>
+            <img src="${obs.photo}" style="position:absolute;top:4px;left:4px;width:28px;height:28px;border-radius:50%;object-fit:cover;">
+          </div>`,
+          iconSize: [36, 44], iconAnchor: [18, 44], className: ''
+        });
+        m = L.marker([lat, lng], { icon });
+      } else {
+        m = L.circleMarker([lat, lng], {
+          radius: 11, color, fillColor: color, fillOpacity: 0.9, weight: 2.5
+        });
+      }
       m.on('click', () => openModal(id, obs));
       m.bindTooltip(label, { direction: 'top', permanent: false });
+      m.addTo(classMapL);
       obsMarkersClass.push(m);
     });
+    // invalidateSize 후 fitBounds는 다음 프레임에 실행 (타이밍 버그 방지)
     classMapL.invalidateSize();
-    // 마커가 있으면 항상 보이도록 fitBounds, 없으면 학교 기본 뷰
-    if (obsMarkersClass.length) {
-      try {
-        const grp = L.featureGroup(obsMarkersClass);
-        classMapL.fitBounds(grp.getBounds().pad(0.25), { maxZoom: 19 });
-      } catch(e) { classMapL.setView(SCHOOL_CENTER, SCHOOL_ZOOM); }
-    } else {
-      classMapL.setView(SCHOOL_CENTER, SCHOOL_ZOOM);
-    }
+    setTimeout(() => {
+      if (obsMarkersClass.length) {
+        try {
+          const grp = L.featureGroup(obsMarkersClass);
+          const bounds = grp.getBounds();
+          if (bounds.isValid()) {
+            classMapL.fitBounds(bounds.pad(0.3), { maxZoom: 19, animate: false });
+          } else {
+            classMapL.setView(SCHOOL_CENTER, SCHOOL_ZOOM);
+          }
+        } catch(e) { classMapL.setView(SCHOOL_CENTER, SCHOOL_ZOOM); }
+      } else {
+        classMapL.setView(SCHOOL_CENTER, SCHOOL_ZOOM);
+      }
+    }, 0);
   }
 
   // ── Stats ──
@@ -1392,10 +1416,15 @@ function switchTab(tabId) {
       if (classMapL) {
         classMapL.invalidateSize();
         renderClassView();
-        // 타일 로딩 후 한 번 더 확인
-        setTimeout(() => { classMapL.invalidateSize(); }, 500);
       }
-    }, 150);
+    }, 200);
+    // 타일 로드 완료 후 한 번 더 — 첫 방문 시 확실하게
+    setTimeout(() => {
+      if (classMapL) {
+        classMapL.invalidateSize();
+        renderClassView();
+      }
+    }, 800);
   }
 }
 
