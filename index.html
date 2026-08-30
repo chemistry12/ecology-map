@@ -7,7 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <style>
 /* ───── Design Tokens ───── */
 :root {
@@ -483,6 +486,138 @@ textarea.inp { height: 80px; resize: none; }
 .leaflet-popup-tip { background: var(--surf); }
 .leaflet-tooltip { background: var(--surf); color: var(--txt); border-color: var(--bdr); border-radius: 8px; font-size: 12px; font-weight: 600; }
 .leaflet-tile-pane { filter: brightness(0.95) saturate(0.9); }
+
+/* ───── MarkerCluster custom ───── */
+.leaflet-cluster-anim .leaflet-marker-icon, .leaflet-cluster-anim .leaflet-marker-shadow {
+  transition: transform .3s ease-out, opacity .3s ease-in;
+}
+.custom-cluster-icon {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; color: #fff; font-weight: 700; font-size: 13px;
+  border: 3px solid rgba(255,255,255,.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ───── 조별 색상 배지 ───── */
+.grp-dot {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 50%; margin-right: 5px; vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* ───── 생물명 자동완성 ───── */
+.autocomplete-wrap { position: relative; }
+.autocomplete-list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--surf); border: 1.5px solid var(--pri);
+  border-radius: var(--r); box-shadow: var(--shadow);
+  max-height: 220px; overflow-y: auto;
+  z-index: 500; display: none;
+}
+.autocomplete-list.open { display: block; }
+.autocomplete-item {
+  padding: 10px 14px; font-size: 14px; cursor: pointer;
+  color: var(--txt); border-bottom: 1px solid var(--bdr);
+  display: flex; align-items: center; gap: 8px;
+}
+.autocomplete-item:last-child { border-bottom: none; }
+.autocomplete-item:hover, .autocomplete-item.focused { background: var(--surf2); }
+.autocomplete-item .ac-count {
+  margin-left: auto; font-size: 11px; color: var(--txt2);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ───── 제출 완료 오버레이 ───── */
+#successOverlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  z-index: 9500; display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .25s;
+}
+#successOverlay.open { opacity: 1; pointer-events: auto; }
+.success-card {
+  background: var(--surf); border-radius: 24px; padding: 36px 28px;
+  max-width: 320px; width: 90%; text-align: center;
+  transform: scale(.9); transition: transform .25s;
+  box-shadow: 0 8px 40px rgba(0,0,0,.3);
+}
+#successOverlay.open .success-card { transform: scale(1); }
+.success-emoji { font-size: 64px; margin-bottom: 12px; }
+.success-species { font-size: 22px; font-weight: 700; color: var(--txt); margin-bottom: 6px; }
+.success-meta { font-size: 14px; color: var(--txt2); margin-bottom: 8px; line-height: 1.6; }
+.success-total {
+  font-size: 13px; color: var(--pri); font-weight: 700;
+  background: var(--surf2); border-radius: 99px; padding: 4px 14px;
+  display: inline-block; margin-bottom: 20px; border: 1px solid var(--bdr);
+}
+.success-next {
+  width: 100%; padding: 14px; border-radius: var(--r);
+  background: var(--pri); color: #fff; font-size: 16px; font-weight: 700;
+  margin-bottom: 10px;
+}
+.success-next:active { opacity: .85; }
+.success-view {
+  width: 100%; padding: 11px; border-radius: var(--r);
+  background: var(--surf2); color: var(--txt); font-size: 14px; font-weight: 600;
+  border: 1.5px solid var(--bdr);
+}
+
+/* ───── 내 기록 카드 (개선) ───── */
+.mine-card {
+  background: var(--surf); border-radius: var(--r);
+  box-shadow: var(--shadow); overflow: hidden;
+  display: flex; flex-direction: column;
+  cursor: pointer; transition: transform .15s;
+}
+.mine-card:active { transform: scale(.98); }
+.mine-card-thumb {
+  width: 100%; height: 160px; object-fit: cover;
+  background: var(--surf2); display: block;
+}
+.mine-card-thumb-placeholder {
+  width: 100%; height: 120px;
+  background: var(--surf2); display: flex; align-items: center;
+  justify-content: center; font-size: 40px;
+}
+.mine-card-body { padding: 12px 14px 14px; }
+.mine-card-species { font-size: 16px; font-weight: 700; color: var(--txt); margin-bottom: 4px; }
+.mine-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.mine-card-tag {
+  font-size: 11px; padding: 2px 9px; border-radius: 99px;
+  background: var(--surf2); color: var(--txt2); border: 1px solid var(--bdr);
+}
+.mine-card-notes { font-size: 12px; color: var(--txt2); margin-bottom: 4px; font-style: italic; }
+.mine-card-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--txt2); }
+.mine-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 0 80px; }
+@media (min-width: 480px) { .mine-grid { grid-template-columns: repeat(3, 1fr); } }
+
+/* ───── 관리자 통계 패널 ───── */
+.admin-stats-panel {
+  background: var(--surf2); border-radius: var(--r); padding: 14px 16px;
+  margin: 0 16px 12px; border: 1.5px solid var(--bdr);
+}
+.admin-stats-title {
+  font-size: 12px; font-weight: 700; color: var(--txt2);
+  text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px;
+}
+.admin-stats-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--bdr);
+  font-size: 13px; color: var(--txt);
+}
+.admin-stats-row:last-child { border-bottom: none; }
+.admin-stats-cls { flex: 1; font-weight: 600; }
+.admin-stats-bar-wrap { flex: 2; height: 8px; background: var(--bdr); border-radius: 99px; overflow: hidden; }
+.admin-stats-bar-fill { height: 100%; border-radius: 99px; transition: width .4s; }
+.admin-stats-nums { width: 80px; text-align: right; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--txt2); }
+
+/* ───── 중복 경고 배너 ───── */
+.dup-warning {
+  background: #FFF8E8; border: 1.5px solid #F0C040; border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; color: #7A5000; margin-bottom: 10px;
+  display: none;
+}
+.dup-warning.visible { display: block; }
 </style>
 </head>
 <body>
@@ -603,11 +738,17 @@ const FB_CONFIG = {
           </div>
         </div>
 
-        <!-- 생물 이름 -->
+        <!-- 생물 이름 (자동완성) -->
         <div class="form-section">
           <label>생물 이름 <span style="font-weight:400;color:var(--txt2)">(구글 렌즈로 동정 후 입력)</span></label>
-          <input class="inp" id="inpSpecies" type="text" placeholder="예) 참새, 민들레, 배추흰나비…" autocomplete="off">
+          <div class="autocomplete-wrap" id="speciesWrap">
+            <input class="inp" id="inpSpecies" type="text" placeholder="예) 참새, 민들레, 배추흰나비…" autocomplete="off">
+            <div class="autocomplete-list" id="speciesList"></div>
+          </div>
         </div>
+
+        <!-- 중복 경고 -->
+        <div class="dup-warning" id="dupWarning"></div>
 
         <!-- 사진 -->
         <div class="form-section">
@@ -709,6 +850,18 @@ const FB_CONFIG = {
 </div><!-- /app -->
 
 
+<!-- 제출 완료 오버레이 -->
+<div id="successOverlay">
+  <div class="success-card">
+    <div class="success-emoji">🎉</div>
+    <div class="success-species" id="successSpeciesText"></div>
+    <div class="success-meta" id="successMetaText"></div>
+    <div class="success-total" id="successTotalText"></div>
+    <button class="success-next" onclick="closeSuccess()">다음 생물 기록하기 →</button>
+    <button class="success-view" onclick="closeSuccess();switchTab('tab-map')">🗺️ 생태지도에서 보기</button>
+  </div>
+</div>
+
 <!-- Admin Login Modal -->
 <div class="modal-bg" id="adminLoginBg">
   <div class="modal" id="adminLoginModal" style="max-width:320px;">
@@ -790,6 +943,32 @@ const CLS_COLORS = [
   '#FB8C00','#6D4C41','#EC407A','#AB47BC','#26C6DA',
 ];
 
+/* 조별 고정 색상 팔레트 */
+const GROUP_COLORS = {
+  '1조': '#1E88E5', // 파랑
+  '2조': '#43A047', // 초록
+  '3조': '#F4511E', // 주황
+  '4조': '#8E24AA', // 보라
+  '5조': '#00897B', // 청록
+  '6조': '#D81B60', // 분홍
+  '개인': '#757575', // 회색
+};
+function groupColor(grp) {
+  return GROUP_COLORS[grp] || '#3B7A4A';
+}
+
+/* 공통 생물 자동완성 목록 */
+const COMMON_SPECIES = [
+  '참새','까치','비둘기','까마귀','오리','제비','박새','딱새','물까치','멧비둘기','황조롱이',
+  '고양이','개','고슴도치','다람쥐','청설모','두더지',
+  '개구리','청개구리','두꺼비','도롱뇽','도마뱀','뱀',
+  '배추흰나비','호랑나비','꿀벌','말벌','무당벌레','개미','잠자리','매미','딱정벌레','사마귀','귀뚜라미','반딧불이','하늘소',
+  '민들레','토끼풀','쑥','명아주','질경이','개망초','고들빼기','애기똥풀','괭이밥','닭의장풀','강아지풀','바랭이',
+  '소나무','잣나무','은행나무','벚나무','느티나무','단풍나무','플라타너스','참나무','상수리나무','아카시나무',
+  '진달래','개나리','철쭉','무궁화','장미','코스모스','해바라기',
+  '칡','담쟁이덩굴','머위','고사리','이끼','버섯',
+];
+
 /* ──── State ──── */
 let observations = {};
 let obsRef = null;
@@ -798,6 +977,7 @@ let pinLat = null, pinLng = null;
 let formMapL = null, mainMapL = null, classMapL = null;
 let formMarker = null;
 let obsMarkersMain = [], obsMarkersClass = [];
+let mainClusterLayer = null, classClusterLayer = null;
 let photoData = null;
 let activeFilter = 'all';
 let currentClassView = '';
@@ -825,9 +1005,109 @@ function initApp() {
   initFormMap();
   initFirebase();
   bindUI();
-  applyStudentInfo(); // 저장된 학생 정보 자동 복원
-  bindStudentIdValidation(); // 학번 실시간 검증
+  applyStudentInfo();
+  bindStudentIdValidation();
+  initSpeciesAutocomplete();
 }
+
+/* ──── 생물명 자동완성 ──── */
+function initSpeciesAutocomplete() {
+  const inp = document.getElementById('inpSpecies');
+  const list = document.getElementById('speciesList');
+  if (!inp || !list) return;
+
+  let focusIdx = -1;
+
+  function getSuggestions(q) {
+    const qLow = q.toLowerCase();
+    // 기존 기록에서 종 이름 빈도 계산
+    const freq = {};
+    Object.values(observations).forEach(o => {
+      if (o.species) freq[o.species] = (freq[o.species] || 0) + 1;
+    });
+    // 기존 종 + 공통 목록 합치기 (중복 제거)
+    const all = [...new Set([...Object.keys(freq), ...COMMON_SPECIES])];
+    return all
+      .filter(s => s.toLowerCase().includes(qLow))
+      .sort((a, b) => (freq[b] || 0) - (freq[a] || 0))
+      .slice(0, 10);
+  }
+
+  function renderList(q) {
+    if (!q) { list.classList.remove('open'); return; }
+    const items = getSuggestions(q);
+    if (!items.length) { list.classList.remove('open'); return; }
+    const freq = {};
+    Object.values(observations).forEach(o => {
+      if (o.species) freq[o.species] = (freq[o.species] || 0) + 1;
+    });
+    list.innerHTML = items.map((s, i) => {
+      const cnt = freq[s] ? `<span class="ac-count">${freq[s]}건</span>` : '';
+      return `<div class="autocomplete-item" data-val="${s}" data-idx="${i}">🌿 ${s}${cnt}</div>`;
+    }).join('');
+    list.classList.add('open');
+    focusIdx = -1;
+    list.querySelectorAll('.autocomplete-item').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault();
+        inp.value = el.dataset.val;
+        list.classList.remove('open');
+        checkDuplicate();
+      });
+    });
+  }
+
+  inp.addEventListener('input', () => { renderList(inp.value.trim()); checkDuplicate(); });
+  inp.addEventListener('keydown', e => {
+    const items = list.querySelectorAll('.autocomplete-item');
+    if (!list.classList.contains('open') || !items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusIdx = Math.min(focusIdx + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('focused', i === focusIdx));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusIdx = Math.max(focusIdx - 1, 0);
+      items.forEach((el, i) => el.classList.toggle('focused', i === focusIdx));
+    } else if (e.key === 'Enter' && focusIdx >= 0) {
+      e.preventDefault();
+      inp.value = items[focusIdx].dataset.val;
+      list.classList.remove('open');
+      checkDuplicate();
+    } else if (e.key === 'Escape') {
+      list.classList.remove('open');
+    }
+  });
+  inp.addEventListener('blur', () => setTimeout(() => list.classList.remove('open'), 150));
+}
+
+/* ──── 중복 감지 ──── */
+function checkDuplicate() {
+  const sid = document.getElementById('inpStudentId').value.trim();
+  const sp  = document.getElementById('inpSpecies').value.trim();
+  const warn = document.getElementById('dupWarning');
+  if (!warn) return;
+  if (!sid || !sp) { warn.classList.remove('visible'); return; }
+  const dup = Object.values(observations).find(o => o.studentId === sid && o.species === sp);
+  if (dup) {
+    warn.textContent = `⚠️ 이미 "${sp}" 기록이 있어요 (${formatTime(dup.timestamp)}). 다른 종을 기록하거나 계속 제출할 수 있어요.`;
+    warn.classList.add('visible');
+  } else {
+    warn.classList.remove('visible');
+  }
+}
+
+/* ──── 성공 오버레이 ──── */
+function showSuccess(species, cls, grp, name, total) {
+  document.getElementById('successSpeciesText').textContent = '🌿 ' + species;
+  document.getElementById('successMetaText').textContent = `${cls} · ${grp} · ${name}`;
+  document.getElementById('successTotalText').textContent = `나의 ${total}번째 기록`;
+  document.getElementById('successOverlay').classList.add('open');
+}
+function closeSuccess() {
+  document.getElementById('successOverlay').classList.remove('open');
+}
+window.closeSuccess = closeSuccess;
 
 function bindStudentIdValidation() {
   const selClass = document.getElementById('selClass');
@@ -1303,11 +1583,13 @@ async function handleSubmit() {
       timestamp: Date.now(),
     };
     await obsRef.push(data);
-    saveStudentInfo(cls, grp, sid, name); // 학생 정보 고정 저장
-    toast('✅ 기록이 저장되었어요!');
+    saveStudentInfo(cls, grp, sid, name);
     const banner = document.getElementById('studentFixedBanner');
     if (banner) banner.style.display = 'flex';
+    // 내 총 기록 수 계산
+    const myTotal = sid ? Object.values(observations).filter(o => o.studentId === sid).length + 1 : 1;
     resetForm();
+    showSuccess(sp, cls, grp, name, myTotal);
   } catch(e) {
     toast('❌ 저장 실패: ' + e.message);
   } finally {
@@ -1421,17 +1703,33 @@ function classColor(className) {
   return CLS_COLORS[idx];
 }
 
+function makeClusterIcon(cluster, baseColor) {
+  const count = cluster.getChildCount();
+  const size = count < 10 ? 36 : count < 50 ? 42 : 50;
+  return L.divIcon({
+    html: `<div class="custom-cluster-icon" style="background:${baseColor};width:${size}px;height:${size}px;">${count}</div>`,
+    iconSize: [size, size], iconAnchor: [size/2, size/2], className: ''
+  });
+}
+
 function renderMapPins() {
   if (!mainMapL) return;
-  obsMarkersMain.forEach(m => mainMapL.removeLayer(m));
+  // 이전 클러스터 제거
+  if (mainClusterLayer) { mainMapL.removeLayer(mainClusterLayer); mainClusterLayer = null; }
   obsMarkersMain = [];
+
+  mainClusterLayer = L.markerClusterGroup({
+    maxClusterRadius: 60,
+    iconCreateFunction: cluster => makeClusterIcon(cluster, '#3B7A4A'),
+    spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true,
+  });
 
   Object.entries(observations).forEach(([id, obs]) => {
     if (activeFilter !== 'all' && obs.class !== activeFilter) return;
     const lat = obs.lat || (obs.mapY != null && (37.3051 - obs.mapY * 0.0014));
     const lng = obs.lng || (obs.mapX != null && (126.9736 + obs.mapX * 0.0024));
     if (!lat || !lng) return;
-    const color = classColor(obs.class);
+    const color = groupColor(obs.group);
     const zone = ZONES.find(z => z.id === obs.location);
     const em = zone ? zone.em : '📍';
     let m;
@@ -1439,15 +1737,16 @@ function renderMapPins() {
       m = L.marker([lat, lng], { icon: makePhotoIcon(obs.photo, color) });
     } else {
       m = L.circleMarker([lat, lng], {
-        radius: 9, color, fillColor: color, fillOpacity: 0.85, weight: 2
+        radius: 10, color, fillColor: color, fillOpacity: 0.88, weight: 2.5
       });
     }
     m.on('click', () => openModal(id, obs));
-    m.bindTooltip(`${em} ${obs.species} (${obs.class})`, { direction: 'top' });
-    m.addTo(mainMapL);
+    m.bindTooltip(`${em} ${obs.species} · ${obs.class} ${obs.group}`, { direction: 'top' });
+    mainClusterLayer.addLayer(m);
     obsMarkersMain.push(m);
   });
 
+  mainMapL.addLayer(mainClusterLayer);
   mainMapL.invalidateSize();
   renderClassFilterChips();
   renderLegend();
@@ -1482,13 +1781,13 @@ function renderClassFilterChips() {
 function renderLegend() {
   const legend = document.getElementById('mapLegend');
   if (!legend) return;
-  const classesPresent = [...new Set(Object.values(observations).map(o => o.class))].sort();
-  if (!classesPresent.length) { legend.innerHTML = ''; return; }
-  legend.innerHTML = `<div class="legend-title">학급 범례</div>
-    <div class="legend-items">
-      ${classesPresent.map(cls => `
-        <div style="display:flex;align-items:center;font-size:12px;color:var(--txt2);">
-          <span class="legend-dot" style="background:${classColor(cls)}"></span>${cls}
+  const groupsPresent = [...new Set(Object.values(observations).map(o => o.group).filter(Boolean))].sort();
+  if (!groupsPresent.length) { legend.innerHTML = ''; return; }
+  legend.innerHTML = `<div class="legend-title">조별 색상 범례</div>
+    <div class="legend-items" style="flex-wrap:wrap;gap:8px;">
+      ${groupsPresent.map(grp => `
+        <div style="display:flex;align-items:center;font-size:12px;color:var(--txt2);gap:4px;">
+          <span class="legend-dot" style="background:${groupColor(grp)}"></span>${grp}
         </div>`).join('')}
     </div>`;
 }
@@ -1515,15 +1814,22 @@ function renderClassView() {
 
   // ── Map ──
   if (classMapL) {
-    obsMarkersClass.forEach(m => classMapL.removeLayer(m));
+    if (classClusterLayer) { classMapL.removeLayer(classClusterLayer); classClusterLayer = null; }
     obsMarkersClass = [];
+
+    classClusterLayer = L.markerClusterGroup({
+      maxClusterRadius: 55,
+      iconCreateFunction: cluster => makeClusterIcon(cluster, '#3B7A4A'),
+      spiderfyOnMaxZoom: true, showCoverageOnHover: false, zoomToBoundsOnClick: true,
+    });
+
     clsObs.forEach(([id, obs]) => {
       const lat = obs.lat || (obs.mapY != null ? (37.3051 - obs.mapY * 0.0014) : null);
       const lng = obs.lng || (obs.mapX != null ? (126.9736 + obs.mapX * 0.0024) : null);
       if (!lat || !lng) return;
-      const color = classColor(obs.class);
+      const color = groupColor(obs.group);
       const zone = ZONES.find(z => z.id === obs.location);
-      const label = `${zone ? zone.em : '📍'} ${obs.species}${isAll ? ' (' + obs.class + ')' : ''}`;
+      const label = `${zone ? zone.em : '📍'} ${obs.species}${isAll ? ' (' + obs.class + ')' : ''} · ${obs.group}`;
       let m;
       if (obs.photo) {
         m = L.marker([lat, lng], { icon: makePhotoIcon(obs.photo, color) });
@@ -1534,16 +1840,16 @@ function renderClassView() {
       }
       m.on('click', () => openModal(id, obs));
       m.bindTooltip(label, { direction: 'top', permanent: false });
-      m.addTo(classMapL);
+      classClusterLayer.addLayer(m);
       obsMarkersClass.push(m);
     });
-    // invalidateSize 후 fitBounds는 다음 프레임에 실행 (타이밍 버그 방지)
+
+    classMapL.addLayer(classClusterLayer);
     classMapL.invalidateSize();
     setTimeout(() => {
       if (obsMarkersClass.length) {
         try {
-          const grp = L.featureGroup(obsMarkersClass);
-          const bounds = grp.getBounds();
+          const bounds = classClusterLayer.getBounds();
           if (bounds.isValid()) {
             classMapL.fitBounds(bounds.pad(0.3), { maxZoom: 19, animate: false });
           } else {
@@ -1563,20 +1869,43 @@ function renderClassView() {
     const uniqueZones   = [...new Set(clsObs.map(([,o]) => o.location))];
     const title = isAll ? '🌿 전체 학년' : cls;
 
-    // 전체 보기일 때 반별 건수 소형 배지
+    // 전체 보기일 때 반별 상세 통계
     let breakdown = '';
     if (isAll) {
       const byClass = {};
-      clsObs.forEach(([, o]) => { byClass[o.class] = (byClass[o.class] || 0) + 1; });
+      clsObs.forEach(([, o]) => {
+        if (!byClass[o.class]) byClass[o.class] = { total: 0, species: new Set() };
+        byClass[o.class].total++;
+        byClass[o.class].species.add(o.species);
+      });
       const sorted = Object.entries(byClass).sort(([a],[b]) => a.localeCompare(b, 'ko'));
       if (sorted.length) {
-        breakdown = `<div class="class-breakdown">` +
-          sorted.map(([c, n]) =>
-            `<div class="class-breakdown-chip">
-               <span style="width:8px;height:8px;border-radius:50%;background:${classColor(c)};display:inline-block;flex-shrink:0;"></span>
-               ${c} <b>${n}</b>건
-             </div>`).join('') +
-          `</div>`;
+        const maxTotal = Math.max(...sorted.map(([,v]) => v.total));
+        if (adminMode) {
+          // 관리자: 막대 그래프 포함 상세 통계
+          breakdown = `<div class="admin-stats-panel">
+            <div class="admin-stats-title">📊 반별 기록 현황</div>
+            ${sorted.map(([c, v]) => {
+              const pct = Math.round(v.total / maxTotal * 100);
+              const color = classColor(c);
+              return `<div class="admin-stats-row">
+                <div class="admin-stats-cls" style="color:${color};">${c}</div>
+                <div class="admin-stats-bar-wrap">
+                  <div class="admin-stats-bar-fill" style="width:${pct}%;background:${color};"></div>
+                </div>
+                <div class="admin-stats-nums">${v.total}건 / ${v.species.size}종</div>
+              </div>`;
+            }).join('')}
+          </div>`;
+        } else {
+          breakdown = `<div class="class-breakdown">` +
+            sorted.map(([c, v]) =>
+              `<div class="class-breakdown-chip">
+                 <span style="width:8px;height:8px;border-radius:50%;background:${classColor(c)};display:inline-block;flex-shrink:0;"></span>
+                 ${c} <b>${v.total}</b>건 · ${v.species.size}종
+               </div>`).join('') +
+            `</div>`;
+        }
       }
     }
 
@@ -1688,6 +2017,15 @@ function switchTab(tabId) {
   if (tabId === 'tab-map') {
     initMainMap();
     setTimeout(() => { if (mainMapL) { mainMapL.invalidateSize(); renderMapPins(); } }, 150);
+  }
+  if (tabId === 'tab-mine') {
+    // 저장된 학번이 있으면 자동 조회
+    const info = loadStudentInfo();
+    if (info && info.sid) {
+      const mineInput = document.getElementById('mineStudentId');
+      if (mineInput && !mineInput.value) mineInput.value = info.sid;
+      lookupMine();
+    }
   }
   if (tabId === 'tab-class') {
     initClassMap();
@@ -1886,28 +2224,62 @@ function lookupMine() {
   const myObs = Object.entries(observations).filter(([, o]) => o.studentId === sid);
   const count = document.getElementById('mineCount');
   const list = document.getElementById('mineList');
+
   if (myObs.length === 0) {
-    count.textContent = '기록이 없습니다.';
-    list.innerHTML = '';
+    count.textContent = '';
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>기록이 없어요</p></div>`;
     return;
   }
-  count.textContent = `총 ${myObs.length}개의 기록`;
+
+  // 통계 헤더
+  const species = [...new Set(myObs.map(([,o]) => o.species))];
+  const firstObs = myObs[0][1];
+  count.innerHTML = `
+    <div style="background:var(--surf);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow);">
+      <div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:6px;">
+        ${firstObs.class} · ${firstObs.group} · ${firstObs.name || sid}
+      </div>
+      <div style="display:flex;gap:16px;">
+        <div style="text-align:center;">
+          <div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--pri);">${myObs.length}</div>
+          <div style="font-size:11px;color:var(--txt2);">총 기록</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--pri);">${species.length}</div>
+          <div style="font-size:11px;color:var(--txt2);">종 수</div>
+        </div>
+      </div>
+    </div>`;
+
+  // 카드 그리드
   list.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'mine-grid';
+
   myObs.sort(([,a],[,b]) => b.timestamp - a.timestamp).forEach(([id, obs]) => {
     const zone = ZONES.find(z => z.id === obs.location);
+    const grpColor = groupColor(obs.group);
     const card = document.createElement('div');
-    card.className = 'obs-card';
+    card.className = 'mine-card';
     card.innerHTML = `
-      ${obs.photo ? `<img class="obs-thumb" src="${obs.photo}" alt="${obs.species}">` : ''}
-      <div class="obs-card-body">
-        <div class="obs-card-title">${zone ? zone.em : '📍'} ${obs.species}</div>
-        <div class="obs-card-meta">${obs.location} · ${obs.class} ${obs.group}</div>
-        <div class="obs-card-meta">${formatTime(obs.timestamp)}</div>
-        ${obs.notes ? `<div class="obs-card-notes">${obs.notes}</div>` : ''}
+      ${obs.photo
+        ? `<img class="mine-card-thumb" src="${obs.photo}" alt="${obs.species}">`
+        : `<div class="mine-card-thumb-placeholder">${zone ? zone.em : '📍'}</div>`}
+      <div class="mine-card-body">
+        <div class="mine-card-species">${obs.species}</div>
+        <div class="mine-card-tags">
+          <span class="mine-card-tag" style="background:${grpColor}20;border-color:${grpColor}40;color:${grpColor};">
+            <span class="grp-dot" style="background:${grpColor};width:7px;height:7px;"></span>${obs.group}
+          </span>
+          <span class="mine-card-tag">${obs.location}</span>
+        </div>
+        ${obs.notes ? `<div class="mine-card-notes">${obs.notes}</div>` : ''}
+        <div class="mine-card-time">${formatTime(obs.timestamp)}</div>
       </div>`;
     card.onclick = () => openModal(id, obs);
-    list.appendChild(card);
+    grid.appendChild(card);
   });
+  list.appendChild(grid);
 }
 
 /* ──── Event Bindings ──── */
