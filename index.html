@@ -288,11 +288,33 @@ textarea.inp { height: 80px; resize: none; }
 /* ── 반응형: PC에서 지도 크게 ── */
 @media (min-width: 768px) {
   #formMap { height: 380px !important; }
-  #mainMapContainer { height: 520px !important; }
-  #classMapContainer { height: 460px !important; }
-  .class-wrap, .map-wrap { max-width: 900px; margin: 0 auto; }
-  .form-wrap { max-width: 680px; }
+  /* 지도 탭/학급별 탭은 전체 너비 사용 */
+  #mainMapContainer { height: calc(100vh - 160px) !important; min-height: 480px; }
+  #classMapContainer { height: calc(100vh - 280px) !important; min-height: 380px; }
+  /* 텍스트/폼 영역만 max-width 제한 */
+  .form-wrap { max-width: 680px; margin: 0 auto; }
+  .class-wrap { max-width: 100%; padding: 12px 20px; }
+  .map-wrap { max-width: 100%; padding: 0; }
+  /* 생태지도 탭 필터 칩도 가운데 정렬 */
+  #mapFilterRow { max-width: 900px; margin: 8px auto; padding: 0 20px; }
+  /* 학급별 텍스트 컨텐츠(통계, 카드)는 max-width */
+  .stats-bar, #groupFilterRow, #obsListClass, .class-breakdown { max-width: 900px; margin-left: auto; margin-right: auto; }
 }
+
+/* 전체화면 모드 */
+.map-fullscreen {
+  position: fixed !important; inset: 0 !important;
+  z-index: 8000 !important; border-radius: 0 !important;
+  height: 100dvh !important; width: 100dvw !important;
+}
+.map-fs-btn {
+  position: absolute; top: 10px; right: 10px; z-index: 1000;
+  background: white; border: 2px solid rgba(0,0,0,.2); border-radius: 4px;
+  width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+.map-fs-btn:hover { background: #f4f4f4; }
 
 .stats-bar {
   background: var(--surf); border-radius: var(--r); padding: 14px 16px;
@@ -606,8 +628,10 @@ const FB_CONFIG = {
         <button class="filter-chip active" data-filter="all">전체</button>
         <div id="classFilterChips" style="display:contents;"></div>
       </div>
-      <div class="map-wrap">
-        <div class="map-container" id="mainMapContainer" style="height:320px;"></div>
+      <div class="map-wrap" style="position:relative;">
+        <div class="map-container" id="mainMapContainer" style="height:320px;">
+          <button class="map-fs-btn" id="mainFsBtn" title="전체화면" onclick="toggleMapFs('main')">⛶</button>
+        </div>
       </div>
       <div class="legend" id="mapLegend"></div>
     </div>
@@ -620,7 +644,10 @@ const FB_CONFIG = {
           <select class="inp" id="classViewSel" style="max-width:180px;"></select>
         </div>
         <div class="group-filter-row" id="groupFilterRow"></div>
-        <div class="class-map-container" id="classMapContainer" style="height:260px;"></div>
+        <div style="position:relative;">
+          <div class="class-map-container" id="classMapContainer" style="height:260px;"></div>
+          <button class="map-fs-btn" id="classFsBtn" title="전체화면" onclick="toggleMapFs('class')">⛶</button>
+        </div>
         <div class="stats-bar" id="statsBar"></div>
         <div class="obs-list" id="obsList"></div>
       </div>
@@ -1225,6 +1252,39 @@ function resetForm() {
   const tools = document.getElementById('formMapTools');
   if (tools) tools.style.display = 'none';
 }
+
+/* ──── Map Fullscreen Toggle ──── */
+const _fsState = { main: false, class: false };
+function toggleMapFs(which) {
+  const containerId = which === 'main' ? 'mainMapContainer' : 'classMapContainer';
+  const mapL        = which === 'main' ? mainMapL : classMapL;
+  const btnId       = which === 'main' ? 'mainFsBtn' : 'classFsBtn';
+  const el          = document.getElementById(containerId);
+  const btn         = document.getElementById(btnId);
+  _fsState[which]   = !_fsState[which];
+
+  if (_fsState[which]) {
+    el.classList.add('map-fullscreen');
+    btn.textContent = '✕';
+    btn.title = '닫기';
+    document.body.style.overflow = 'hidden';
+  } else {
+    el.classList.remove('map-fullscreen');
+    btn.textContent = '⛶';
+    btn.title = '전체화면';
+    document.body.style.overflow = '';
+  }
+  // 크기 변경 후 Leaflet 재계산
+  setTimeout(() => { if (mapL) mapL.invalidateSize(); }, 50);
+}
+// ESC 키로 전체화면 닫기
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (_fsState.main)  toggleMapFs('main');
+    if (_fsState.class) toggleMapFs('class');
+  }
+});
+window.toggleMapFs = toggleMapFs;
 
 /* ──── Photo Pin Icon ──── */
 // SVG <image> + <clipPath> 방식 — Leaflet CSS overflow:hidden 무관하게 동작
