@@ -1147,12 +1147,85 @@ function onData() {
 }
 
 /* ──── Leaflet Map Init ──── */
+/* ──── Tile Layer Helpers ──── */
+const TILES = {
+  voyager: {
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    opts: { maxZoom: 21, maxNativeZoom: 19, subdomains: 'abcd' }
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    opts: { maxZoom: 21, maxNativeZoom: 19 }
+  }
+};
+let satelliteMode = false;
+let tileLayers = {}; // map id → {base, sat}
+
+function makeTileLayers(mapL, mapId) {
+  const base = L.tileLayer(TILES.voyager.url, TILES.voyager.opts).addTo(mapL);
+  const sat  = L.tileLayer(TILES.satellite.url, TILES.satellite.opts);
+  tileLayers[mapId] = { base, sat };
+  if (satelliteMode) { mapL.removeLayer(base); sat.addTo(mapL); }
+}
+
+function toggleSatellite() {
+  satelliteMode = !satelliteMode;
+  Object.values(tileLayers).forEach(({ base, sat }) => {
+    if (satelliteMode) {
+      if (base._map) base._map.removeLayer(base);
+      const mapL = sat._map || (tileLayers.main?.base._map) || mainMapL || classMapL || formMapL;
+      Object.entries(tileLayers).forEach(([id, layers]) => {
+        const m = layers.base._map || layers.sat._map;
+        if (!m) return;
+        if (satelliteMode) { if (layers.base._map === m) m.removeLayer(layers.base); if (layers.sat._map !== m) layers.sat.addTo(m); }
+        else { if (layers.sat._map === m) m.removeLayer(layers.sat); if (layers.base._map !== m) layers.base.addTo(m); }
+      });
+    } else {
+      Object.entries(tileLayers).forEach(([id, layers]) => {
+        const m = layers.sat._map || layers.base._map;
+        if (!m) return;
+        if (layers.sat._map === m) m.removeLayer(layers.sat);
+        if (layers.base._map !== m) layers.base.addTo(m);
+      });
+    }
+  });
+  document.querySelectorAll('.sat-toggle-btn').forEach(btn => {
+    btn.textContent = satelliteMode ? '🗺️ 일반' : '🛰️ 위성';
+    btn.style.background = satelliteMode ? '#1a237e' : '';
+    btn.style.color = satelliteMode ? '#fff' : '';
+  });
+}
+
+function applyTileToMap(mapL, mapId) {
+  if (tileLayers[mapId]) {
+    // already set up — just ensure correct layer is visible
+    const { base, sat } = tileLayers[mapId];
+    if (satelliteMode) {
+      if (base._map) mapL.removeLayer(base);
+      if (!sat._map) sat.addTo(mapL);
+    } else {
+      if (sat._map) mapL.removeLayer(sat);
+      if (!base._map) base.addTo(mapL);
+    }
+    return;
+  }
+  makeTileLayers(mapL, mapId);
+}
+
+function addSatBtn(container) {
+  const btn = document.createElement('button');
+  btn.className = 'map-fs-btn sat-toggle-btn';
+  btn.style.cssText = 'top:10px;right:50px;width:auto;padding:0 8px;font-size:12px;font-weight:600;white-space:nowrap;';
+  btn.textContent = satelliteMode ? '🛰️ 위성' : '🛰️ 위성';
+  btn.onclick = toggleSatellite;
+  container.appendChild(btn);
+}
+
 function initFormMap() {
   if (formMapL) return;
   formMapL = L.map('formMap', { zoomControl: true, attributionControl: false })
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 })
-    .addTo(formMapL);
+  applyTileToMap(formMapL, 'form');
   // Zone reference markers
   ZONES.forEach(z => {
     L.circleMarker([z.lat, z.lng], {
@@ -1212,13 +1285,38 @@ function setupMapGesture(container, mapL) {
 
   let hintTimer, restoreTimer;
 
+  let touchStartTime = 0;
+  let touchStartX = 0, touchStartY = 0;
+
   overlay.addEventListener('touchstart', e => {
     if (e.touches.length >= 2) {
-      // 두 손가락: 오버레이 비활성화 → Leaflet이 터치 수신
+      // 두 손가락: 오버레이 비활성화 → Leaflet이 터치 수신 (핀치 줌)
       overlay.style.pointerEvents = 'none';
       hint.style.opacity = '0';
     } else {
-      // 한 손가락: 힌트 표시, 오버레이가 터치 가로채서 페이지 스크롤
+      // 한 손가락: 탭 vs 스크롤 구분을 위해 시작 위치 기록
+      touchStartTime = Date.now();
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      // 오버레이가 터치를 가로채 페이지 스크롤 허용 (이동 감지 후 결정)
+    }
+  }, { passive: true });
+
+  overlay.addEventListener('touchend', e => {
+    const dt = Date.now() - touchStartTime;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const moved = Math.sqrt(dx*dx + dy*dy) > 8;
+
+    if (!moved && dt < 300) {
+      // 탭(클릭): 오버레이 잠깐 비활성화 → 아래 Leaflet 마커에 클릭 전달
+      overlay.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true,
+        clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY }));
+      setTimeout(() => { overlay.style.pointerEvents = 'auto'; }, 50);
+    } else if (moved) {
+      // 스크롤: 힌트만 표시
       hint.style.opacity = '1';
       clearTimeout(hintTimer);
       hintTimer = setTimeout(() => { hint.style.opacity = '0'; }, 1500);
@@ -1230,7 +1328,7 @@ function setupMapGesture(container, mapL) {
     clearTimeout(restoreTimer);
     restoreTimer = setTimeout(() => {
       if (isTouchDevice) overlay.style.pointerEvents = 'auto';
-    }, 300);
+    }, 350);
   }, { passive: true });
 }
 
@@ -1238,8 +1336,8 @@ function initMainMap() {
   if (mainMapL) return;
   mainMapL = L.map('mainMapContainer', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 })
-    .addTo(mainMapL);
+  applyTileToMap(mainMapL, 'main');
+  addSatBtn(document.getElementById('mainMapContainer'));
   setupMapGesture(document.getElementById('mainMapContainer'), mainMapL);
 }
 
@@ -1247,8 +1345,8 @@ function initClassMap() {
   if (classMapL) return;
   classMapL = L.map('classMapContainer', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 })
-    .addTo(classMapL);
+  applyTileToMap(classMapL, 'class');
+  addSatBtn(document.getElementById('classMapContainer'));
   setupMapGesture(document.getElementById('classMapContainer'), classMapL);
 }
 
