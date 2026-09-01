@@ -1151,8 +1151,8 @@ function initFormMap() {
   if (formMapL) return;
   formMapL = L.map('formMap', { zoomControl: true, attributionControl: false })
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 21, maxNativeZoom: 19 })
-    .addTo(formMapL);
+  const layer = L.tileLayer(OSM_URL, OSM_OPTS).addTo(formMapL);
+  baseLayers['form'] = layer;
   // Zone reference markers
   ZONES.forEach(z => {
     L.circleMarker([z.lat, z.lng], {
@@ -1196,75 +1196,56 @@ function setupMapGesture(container, mapL) {
     mapL.scrollWheelZoom.disable();
   });
 
-  // ── 모바일: 한 손가락 = 페이지 스크롤, 두 손가락 = 지도 조작 ──
-  const overlay = document.createElement('div');
-  overlay.className = 'map-gesture-overlay';
+  // 모바일: 오버레이 없이 Leaflet 네이티브 터치 사용 (핀 클릭 보장)
+  // 한 손가락=지도팬, 두 손가락=줌, 탭=마커 클릭
+}
 
-  const hint = document.createElement('div');
-  hint.className = 'map-gesture-hint';
-  hint.innerHTML = '👆 두 손가락으로<br>지도를 조작하세요';
-  overlay.appendChild(hint);
-  container.appendChild(overlay);
+/* ──── 위성 토글 ──── */
+let satelliteMode = false;
+const OSM_URL  = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const SAT_URL  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+// maxNativeZoom:17 → 줌 18 이상은 타일 업스케일 (gray/no-data 방지)
+const OSM_OPTS = { maxZoom: 21, maxNativeZoom: 19 };
+const SAT_OPTS = { maxZoom: 21, maxNativeZoom: 17 };
 
-  // 터치 기기에서만 오버레이 활성화 (PC는 none 유지 → 마커 클릭 보장)
-  const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-  if (isTouchDevice) overlay.style.pointerEvents = 'auto';
+let baseLayers = {}; // mapId → L.tileLayer
 
-  let hintTimer, restoreTimer;
+function toggleSatellite() {
+  satelliteMode = !satelliteMode;
+  Object.entries(baseLayers).forEach(([id, layer]) => {
+    const m = layer._map;
+    if (!m) return;
+    m.removeLayer(layer);
+    const newLayer = satelliteMode
+      ? L.tileLayer(SAT_URL, SAT_OPTS)
+      : L.tileLayer(OSM_URL, OSM_OPTS);
+    newLayer.addTo(m);
+    newLayer.bringToBack();
+    baseLayers[id] = newLayer;
+  });
+  document.querySelectorAll('.sat-toggle-btn').forEach(btn => {
+    btn.textContent = satelliteMode ? '🗺️ 일반지도' : '🛰️ 위성';
+    btn.style.background = satelliteMode ? '#1565C0' : 'white';
+    btn.style.color = satelliteMode ? '#fff' : '';
+  });
+}
 
-  let touchStartTime = 0;
-  let touchStartX = 0, touchStartY = 0;
-
-  overlay.addEventListener('touchstart', e => {
-    if (e.touches.length >= 2) {
-      // 두 손가락: 오버레이 비활성화 → Leaflet이 터치 수신 (핀치 줌)
-      overlay.style.pointerEvents = 'none';
-      hint.style.opacity = '0';
-    } else {
-      // 한 손가락: 탭 vs 스크롤 구분을 위해 시작 위치 기록
-      touchStartTime = Date.now();
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-      // 오버레이가 터치를 가로채 페이지 스크롤 허용 (이동 감지 후 결정)
-    }
-  }, { passive: true });
-
-  overlay.addEventListener('touchend', e => {
-    const dt = Date.now() - touchStartTime;
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-    const moved = Math.sqrt(dx*dx + dy*dy) > 8;
-
-    if (!moved && dt < 300) {
-      // 탭(클릭): 오버레이 잠깐 비활성화 → 아래 Leaflet 마커에 클릭 전달
-      overlay.style.pointerEvents = 'none';
-      const el = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-      if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true,
-        clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY }));
-      setTimeout(() => { overlay.style.pointerEvents = 'auto'; }, 50);
-    } else if (moved) {
-      // 스크롤: 힌트만 표시
-      hint.style.opacity = '1';
-      clearTimeout(hintTimer);
-      hintTimer = setTimeout(() => { hint.style.opacity = '0'; }, 1500);
-    }
-  }, { passive: true });
-
-  // 터치 끝나면 오버레이 복원 (약간 딜레이 — 연속 두 손가락 동작 허용)
-  container.addEventListener('touchend', () => {
-    clearTimeout(restoreTimer);
-    restoreTimer = setTimeout(() => {
-      if (isTouchDevice) overlay.style.pointerEvents = 'auto';
-    }, 350);
-  }, { passive: true });
+function addSatBtn(container) {
+  const btn = document.createElement('button');
+  btn.className = 'map-fs-btn sat-toggle-btn';
+  btn.style.cssText = 'top:10px;right:46px;width:auto;padding:0 7px;font-size:11px;font-weight:600;white-space:nowrap;min-width:64px;';
+  btn.textContent = '🛰️ 위성';
+  btn.onclick = toggleSatellite;
+  container.appendChild(btn);
 }
 
 function initMainMap() {
   if (mainMapL) return;
   mainMapL = L.map('mainMapContainer', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 21, maxNativeZoom: 19 })
-    .addTo(mainMapL);
+  const layer = L.tileLayer(OSM_URL, OSM_OPTS).addTo(mainMapL);
+  baseLayers['main'] = layer;
+  addSatBtn(document.getElementById('mainMapContainer'));
   setupMapGesture(document.getElementById('mainMapContainer'), mainMapL);
 }
 
@@ -1272,8 +1253,9 @@ function initClassMap() {
   if (classMapL) return;
   classMapL = L.map('classMapContainer', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 21, maxNativeZoom: 19 })
-    .addTo(classMapL);
+  const layer = L.tileLayer(OSM_URL, OSM_OPTS).addTo(classMapL);
+  baseLayers['class'] = layer;
+  addSatBtn(document.getElementById('classMapContainer'));
   setupMapGesture(document.getElementById('classMapContainer'), classMapL);
 }
 
