@@ -1150,8 +1150,8 @@ function onData() {
 /* ──── Tile Layer Helpers ──── */
 const TILES = {
   voyager: {
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    opts: { maxZoom: 21, maxNativeZoom: 19, subdomains: 'abcd' }
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    opts: { maxZoom: 21, maxNativeZoom: 19 }
   },
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
