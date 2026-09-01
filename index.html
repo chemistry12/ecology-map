@@ -304,7 +304,7 @@ textarea.inp { height: 80px; resize: none; }
 /* 지도 제스처 오버레이 */
 .map-gesture-overlay {
   position: absolute; inset: 0; z-index: 600;
-  pointer-events: auto; /* 기본: 터치 가로채기 (페이지 스크롤 허용) */
+  pointer-events: none; /* 기본: 클릭 통과 (PC 마커 클릭 보장) */
 }
 .map-gesture-hint {
   position: absolute; top: 50%; left: 50%;
@@ -1206,6 +1206,10 @@ function setupMapGesture(container, mapL) {
   overlay.appendChild(hint);
   container.appendChild(overlay);
 
+  // 터치 기기에서만 오버레이 활성화 (PC는 none 유지 → 마커 클릭 보장)
+  const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (isTouchDevice) overlay.style.pointerEvents = 'auto';
+
   let hintTimer, restoreTimer;
 
   overlay.addEventListener('touchstart', e => {
@@ -1225,11 +1229,7 @@ function setupMapGesture(container, mapL) {
   container.addEventListener('touchend', () => {
     clearTimeout(restoreTimer);
     restoreTimer = setTimeout(() => {
-      if (!_fsState.main && !_fsState.class) { // 전체화면 아닐 때만
-        overlay.style.pointerEvents = 'auto';
-      } else {
-        overlay.style.pointerEvents = 'auto';
-      }
+      if (isTouchDevice) overlay.style.pointerEvents = 'auto';
     }, 300);
   }, { passive: true });
 }
@@ -1629,19 +1629,19 @@ function toggleMapFs(which) {
   // 제스처 오버레이 — 전체화면에서도 동작 유지
   const overlay = el.querySelector('.map-gesture-overlay');
 
+  const isTouchDev = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   if (_fsState[which]) {
     el.classList.add('map-fullscreen');
     btn.textContent = '✕';
     btn.title = '닫기';
     document.body.style.overflow = 'hidden';
-    // 전체화면에서 오버레이는 계속 살아있음 (z-index 600 < fullscreen 8000 내부)
-    if (overlay) overlay.style.pointerEvents = 'auto';
+    if (overlay && isTouchDev) overlay.style.pointerEvents = 'auto';
   } else {
     el.classList.remove('map-fullscreen');
     btn.textContent = '⛶';
     btn.title = '전체화면';
     document.body.style.overflow = '';
-    if (overlay) overlay.style.pointerEvents = 'auto';
+    if (overlay && isTouchDev) overlay.style.pointerEvents = 'auto';
   }
   // 크기 변경 후 Leaflet 재계산
   setTimeout(() => { if (mapL) mapL.invalidateSize(); }, 50);
