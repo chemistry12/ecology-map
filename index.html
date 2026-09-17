@@ -1077,6 +1077,23 @@ function initApp() {
   applyStudentInfo();
   bindStudentIdValidation();
   initSpeciesAutocomplete();
+  initBackGuard();
+}
+
+/* ──── 뒤로가기 가드 (모바일 실수 방지) ──── */
+function initBackGuard() {
+  // 앱 진입 시 히스토리 스택에 상태 하나 추가
+  history.pushState({ ecologyApp: true }, '', location.href);
+
+  window.addEventListener('popstate', () => {
+    // 모달이 열려있으면 닫고 스택 유지
+    const modalBg     = document.getElementById('modalBg');
+    const editModalBg = document.getElementById('editModalBg');
+    if (modalBg     && modalBg.classList.contains('open'))     { modalBg.classList.remove('open'); }
+    if (editModalBg && editModalBg.classList.contains('open')) { editModalBg.classList.remove('open'); }
+    // 앱 안에 머물도록 스택 다시 쌓기
+    history.pushState({ ecologyApp: true }, '', location.href);
+  });
 }
 
 /* ──── 생물명 자동완성 ──── */
@@ -1690,8 +1707,9 @@ async function handleSubmit() {
     };
     const result = await gasAPI('add', { data });
     // 로컬 캐시에 즉시 반영 (폴링 전까지 UI에 표시)
+    // photo는 Drive URL로 교체 (base64 대신)
     if (result && result.id) {
-      observations[result.id] = data;
+      observations[result.id] = { ...data, photo: result.photoUrl || data.photo };
       onData();
     }
     saveStudentInfo(cls, grp, sid, name);
