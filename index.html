@@ -1192,21 +1192,27 @@ function bindStudentIdValidation() {
     if (!cls || !sid) { hint.textContent = ''; return; }
     const prefix = expectedSidPrefix(cls);
     if (!prefix) { hint.textContent = ''; return; }
+    const inpName = document.getElementById('inpName');
     if (!sid.startsWith(prefix)) {
       hint.style.color = 'var(--danger, #e53)';
       hint.textContent = `❌ ${cls}은 ${prefix}○○ 형식이어야 해요`;
+      if (inpName) { inpName.value = ''; inpName.readOnly = false; inpName.style.background = ''; }
     } else if (!/^\d{5}$/.test(sid)) {
       hint.style.color = 'var(--danger, #e53)';
       hint.textContent = '❌ 숫자 5자리로 입력하세요';
+      if (inpName) { inpName.value = ''; inpName.readOnly = false; inpName.style.background = ''; }
     } else if (STUDENT_ROSTER && !STUDENT_ROSTER[sid]) {
       hint.style.color = 'var(--danger, #e53)';
       hint.textContent = '❌ 명단에 없는 학번이에요. 다시 확인해주세요';
+      if (inpName) { inpName.value = ''; inpName.readOnly = false; inpName.style.background = ''; }
     } else if (STUDENT_ROSTER && STUDENT_ROSTER[sid]) {
       hint.style.color = 'var(--pri)';
       hint.textContent = `✅ ${STUDENT_ROSTER[sid]} 학생 확인됨`;
-      // 이름 자동입력
-      const inpName = document.getElementById('inpName');
-      if (inpName && !inpName.value) inpName.value = STUDENT_ROSTER[sid];
+      if (inpName) {
+        inpName.value = STUDENT_ROSTER[sid];
+        inpName.readOnly = true;
+        inpName.style.background = 'var(--surf2)';
+      }
     } else {
       hint.style.color = 'var(--pri)';
       hint.textContent = '✅ 학번 형식 확인됨';
@@ -1685,7 +1691,11 @@ async function handleSubmit() {
   // 명단 검사 (테스트반 제외)
   if (STUDENT_ROSTER && cls !== '테스트반' && cls !== '1학년 12반(테스트)') {
     if (!STUDENT_ROSTER[sid]) { showErr('⚠️ 명단에 없는 학번이에요. 다시 확인해주세요'); return; }
+    // 이름 강제 매칭 — 임의로 이름 바꿔도 명단 이름으로 덮어쓰기
+    document.getElementById('inpName').value = STUDENT_ROSTER[sid];
   }
+  // 이름을 다시 읽기 (명단 덮어쓰기 반영)
+  const finalName = document.getElementById('inpName').value.trim();
   if (!sp)   { showErr('⚠️ 생물 이름을 입력하세요'); return; }
   if (!selectedZone && pinLat === null) { showErr('⚠️ 발견 위치를 선택하거나 지도에 핀을 찍으세요'); return; }
 
@@ -1702,7 +1712,7 @@ async function handleSubmit() {
       class:     cls,
       group:     grp,
       studentId: sid,
-      name:      name,
+      name:      finalName || name,
       species:   sp,
       location:  selectedZone || '기타',
       lat:       pinLat !== null ? pinLat : (ZONES.find(z => z.id === selectedZone)?.lat ?? SCHOOL_CENTER[0]),
@@ -2083,7 +2093,7 @@ function renderClassView() {
     const metaLine = isAll
       ? `${obs.class} · ${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''} · ${obs.location}`
       : `${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''} · ${obs.location}`;
-    const safeSpecies = (obs.species || '').replace(/'/g, "\\'");
+    const safeSpecies = (String(obs.species || '')).replace(/'/g, "\\'");
     card.innerHTML = `
       ${obs.photo
         ? `<img class="obs-card-img" src="${obs.photo}" alt="${obs.species}">`
