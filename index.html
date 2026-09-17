@@ -1235,10 +1235,27 @@ function bindStudentIdValidation() {
 function initFirebase() {
   try {
     firebase.initializeApp(FB_CONFIG);
-    obsRef      = firebase.database().ref('observations');
-    obsRef.on('value', snap => {
+    obsRef = firebase.database().ref('observations');
+
+    // 최초 1회 전체 다운로드
+    obsRef.once('value', snap => {
       observations = snap.val() || {};
       onData();
+
+      // 이후에는 변경된 레코드만 개별 수신 (전체 재다운로드 방지)
+      obsRef.on('child_added', snap => {
+        if (observations[snap.key]) return; // 이미 있는 데이터 무시
+        observations[snap.key] = snap.val();
+        onData();
+      });
+      obsRef.on('child_changed', snap => {
+        observations[snap.key] = snap.val();
+        onData();
+      });
+      obsRef.on('child_removed', snap => {
+        delete observations[snap.key];
+        onData();
+      });
     }, err => {
       toast('❌ DB 연결 오류: ' + err.message);
     });
