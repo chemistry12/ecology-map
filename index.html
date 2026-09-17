@@ -1190,14 +1190,6 @@ function initFormMap() {
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
   const layer = L.tileLayer(OSM_URL, OSM_OPTS).addTo(formMapL);
   baseLayers['form'] = layer;
-  // Zone reference markers
-  ZONES.forEach(z => {
-    L.circleMarker([z.lat, z.lng], {
-      radius: 7, color: 'var(--pri)', fillColor: '#7CAE87',
-      fillOpacity: 0.7, weight: 2
-    }).addTo(formMapL)
-      .bindTooltip(z.em + ' ' + z.id, { permanent: false, direction: 'top' });
-  });
   formMapL.on('click', e => {
     setFormPin(e.latlng.lat, e.latlng.lng);
     autoSelectZone(e.latlng.lat, e.latlng.lng);
