@@ -905,6 +905,7 @@ const FB_CONFIG = {
     <!-- 관리자 전용 필드 -->
     <div id="editAdminFields" style="display:none;margin-bottom:10px;padding:10px 12px;background:var(--surf2);border-radius:var(--r);border:1px solid var(--bdr);">
       <div style="font-size:11px;font-weight:700;color:var(--acc);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">🔓 관리자 전용</div>
+      <select class="inp" id="editClassSel" style="margin-bottom:8px;"></select>
       <div class="row2">
         <input class="inp" id="editStudentId" type="text" placeholder="학번" inputmode="numeric">
         <input class="inp" id="editNameInp" type="text" placeholder="이름">
@@ -1014,7 +1015,7 @@ let activeFilter = 'all';
 let currentClassView = '';
 let themeMode = localStorage.getItem('theme') || 'auto';
 let adminMode = false;
-const ADMIN_PW = 'ys1990';
+const ADMIN_PW = '1990';
 let editingId = null;
 let currentGroupFilter = 'all';
 
@@ -2253,6 +2254,18 @@ function openEditModal(id) {
   // 관리자 전용 필드 표시/숨김
   const adminFields = document.getElementById('editAdminFields');
   if (adminFields) adminFields.style.display = adminMode ? 'block' : 'none';
+  // 반 선택 드롭다운 채우기
+  const editClassSel = document.getElementById('editClassSel');
+  editClassSel.innerHTML = '';
+  for (let c = 1; c <= 11; c++) {
+    const v = `1학년 ${c}반`;
+    const o = new Option(v, v);
+    if (obs.class === v) o.selected = true;
+    editClassSel.appendChild(o);
+  }
+  const testOpt = new Option('🧪 테스트반', '테스트반');
+  if (obs.class === '테스트반') testOpt.selected = true;
+  editClassSel.appendChild(testOpt);
   document.getElementById('editStudentId').value = obs.studentId || '';
   document.getElementById('editNameInp').value = obs.name || '';
   document.getElementById('editSpecies').value = obs.species || '';
@@ -2285,8 +2298,10 @@ function saveEdit() {
   const updates = { species, notes, location };
   // 관리자 모드: 학번/이름도 수정
   if (adminMode) {
+    const cls  = document.getElementById('editClassSel').value;
     const sid  = document.getElementById('editStudentId').value.trim();
     const name = document.getElementById('editNameInp').value.trim();
+    if (cls)  updates.class = cls;
     if (sid)  updates.studentId = sid;
     if (name) updates.name = name;
   }
