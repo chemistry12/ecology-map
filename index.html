@@ -744,7 +744,6 @@ const FB_CONFIG = {
     <button class="icon-btn" id="adminBtn" title="관리자 모드">🔒</button>
     <button class="icon-btn" id="csvBtn" title="CSV 내보내기 (관리자)" style="display:none;" onclick="exportCSV()">📥</button>
     <button class="icon-btn" id="themeBtn" title="다크모드 전환">🌙</button>
-    <button class="icon-btn" id="refreshBtn" title="새로고침">🔄</button>
   </div>
 
   <!-- Tab Content -->
@@ -2629,10 +2628,6 @@ function bindUI() {
     applyTheme();
   });
 
-  // Refresh
-  document.getElementById('refreshBtn').addEventListener('click', () => {
-    toast('🔄 최신 데이터 로딩 중…');
-  });
 
   // Photo area initial render
   renderPhotoArea();
