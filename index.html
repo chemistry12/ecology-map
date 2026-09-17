@@ -800,9 +800,25 @@ const FB_CONFIG = {
           </div>
         </div>
 
+        <!-- 사진 -->
+        <div class="form-section">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <label style="margin-bottom:0;">사진</label>
+            <a href="https://lens.google.com/" target="_blank" rel="noopener"
+               style="font-size:12px;font-weight:600;color:var(--pri);text-decoration:none;padding:4px 10px;border:1.5px solid var(--pri);border-radius:99px;white-space:nowrap;">
+              🔍 구글 렌즈로 동정
+            </a>
+          </div>
+          <div class="photo-area" id="photoArea" onclick="document.getElementById('photoInput').click()">
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">탭하여 사진 촬영 또는 선택</div>
+          </div>
+          <input type="file" id="photoInput" accept="image/*" style="display:none">
+        </div>
+
         <!-- 생물 이름 (자동완성) -->
         <div class="form-section">
-          <label>생물 이름 <span style="font-weight:400;color:var(--txt2)">(구글 렌즈로 동정 후 입력)</span></label>
+          <label>생물 이름</label>
           <div class="autocomplete-wrap" id="speciesWrap">
             <input class="inp" id="inpSpecies" type="text" placeholder="예) 참새, 민들레, 배추흰나비…" autocomplete="off">
             <div class="autocomplete-list" id="speciesList"></div>
@@ -811,16 +827,6 @@ const FB_CONFIG = {
 
         <!-- 중복 경고 -->
         <div class="dup-warning" id="dupWarning"></div>
-
-        <!-- 사진 -->
-        <div class="form-section">
-          <label>사진</label>
-          <div class="photo-area" id="photoArea" onclick="document.getElementById('photoInput').click()">
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">탭하여 사진 촬영 또는 선택</div>
-          </div>
-          <input type="file" id="photoInput" accept="image/*" style="display:none">
-        </div>
 
         <!-- 메모 -->
         <div class="form-section">
@@ -1386,18 +1392,16 @@ function buildClassSelect() {
   const sel = document.getElementById('selClass');
   const viewSel = document.getElementById('classViewSel');
 
-  // 기록하기 탭: 1~11반 + 테스트반
+  // 기록하기 탭: 1~11반 (테스트반은 관리자 전용 — 나중에 추가)
   for (let c = 1; c <= 11; c++) {
     sel.appendChild(new Option(`1학년 ${c}반`, `1학년 ${c}반`));
   }
-  sel.appendChild(new Option('🧪 테스트반', '테스트반'));
 
-  // 학급별 탭: 전체 학년 + 1~11반 + 테스트반
+  // 학급별 탭: 전체 학년 + 1~11반 (테스트반은 관리자 전용 — 나중에 추가)
   viewSel.appendChild(new Option('🌿 전체 학년', '__all__'));
   for (let c = 1; c <= 11; c++) {
     viewSel.appendChild(new Option(`1학년 ${c}반`, `1학년 ${c}반`));
   }
-  viewSel.appendChild(new Option('🧪 테스트반', '테스트반'));
 
   viewSel.addEventListener('change', () => {
     currentClassView = viewSel.value;
@@ -2342,6 +2346,20 @@ function resetFormMapToSchool() {
 
 /* ──── Admin Mode ──── */
 function updateAdminUI() {
+  // 테스트반 옵션 — 관리자 모드일 때만 표시
+  const selClass  = document.getElementById('selClass');
+  const viewSel   = document.getElementById('classViewSel');
+  ['selClass', 'classViewSel'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const existing = sel.querySelector('option[value="테스트반"]');
+    if (adminMode && !existing) {
+      sel.appendChild(new Option('🧪 테스트반', '테스트반'));
+    } else if (!adminMode && existing) {
+      existing.remove();
+    }
+  });
+
   // 학급별 탭 전체 잠금 버튼
   const lockClassBtn = document.getElementById('lockAllClassBtn');
   if (lockClassBtn) lockClassBtn.style.display = adminMode ? '' : 'none';
