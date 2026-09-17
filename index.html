@@ -428,6 +428,23 @@ textarea.inp { height: 80px; resize: none; }
   color: var(--txt); font-size: 15px; font-weight: 600;
   border-radius: 0 0 16px 16px;
 }
+/* ───── Modal Nav ───── */
+.modal-nav-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px 0; gap: 8px;
+}
+.modal-nav-btn {
+  flex: 1; padding: 9px 0; border-radius: 10px;
+  background: var(--surf2); border: 1.5px solid var(--bdr);
+  color: var(--txt2); font-size: 18px; font-weight: 700;
+  cursor: pointer; transition: background .15s;
+}
+.modal-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.modal-nav-btn:not(:disabled):active { background: var(--bdr); }
+.modal-nav-counter {
+  font-size: 12px; color: var(--txt2); font-family: 'DM Mono', monospace;
+  white-space: nowrap; text-align: center; min-width: 48px;
+}
 
 /* ───── Toast ───── */
 .toast {
@@ -955,6 +972,11 @@ const FB_CONFIG = {
 <div class="modal-bg" id="modalBg">
   <div class="modal" id="modal">
     <div id="modalContent"></div>
+    <div class="modal-nav-row" id="modalNavRow" style="display:none;">
+      <button class="modal-nav-btn" id="modalPrevBtn" onclick="modalNav(-1)">◀</button>
+      <span class="modal-nav-counter" id="modalNavCounter"></span>
+      <button class="modal-nav-btn" id="modalNextBtn" onclick="modalNav(1)">▶</button>
+    </div>
     <button class="modal-close" id="modalClose">닫기</button>
   </div>
 </div>
@@ -1796,6 +1818,17 @@ function renderMapPins() {
   obsMarkersMain.forEach(m => mainMapL.removeLayer(m));
   obsMarkersMain = [];
 
+  // 생태지도 탭용 목록 (위치 있는 것만, 타임스탬프 내림차순)
+  const mapList = Object.entries(observations)
+    .filter(([, o]) => {
+      if (activeFilter !== 'all' && o.class !== activeFilter) return false;
+      const lat = o.lat || (o.mapY != null && (37.3051 - o.mapY * 0.0014));
+      const lng = o.lng || (o.mapX != null && (126.9736 + o.mapX * 0.0024));
+      return !!(lat && lng);
+    })
+    .sort(([, a], [, b]) => b.timestamp - a.timestamp)
+    .map(([id, obs]) => ({ id, obs }));
+
   Object.entries(observations).forEach(([id, obs]) => {
     if (activeFilter !== 'all' && obs.class !== activeFilter) return;
     const lat = obs.lat || (obs.mapY != null && (37.3051 - obs.mapY * 0.0014));
@@ -1812,7 +1845,7 @@ function renderMapPins() {
         radius: 10, color, fillColor: color, fillOpacity: 0.88, weight: 2.5
       });
     }
-    m.on('click', () => openModal(id, obs));
+    m.on('click', () => openModal(id, obs, mapList));
     m.bindTooltip(`${em} ${obs.species} · ${obs.class} ${obs.group}`, { direction: 'top' });
     m.addTo(mainMapL);
     obsMarkersMain.push(m);
@@ -1891,6 +1924,16 @@ function renderClassView() {
     obsMarkersClass.forEach(m => classMapL.removeLayer(m));
     obsMarkersClass = [];
 
+    // 학급별 탭 네비게이션 목록 (위치 있는 것, 타임스탬프 내림차순)
+    const classPinList = clsObs
+      .filter(([, o]) => {
+        const lat = o.lat || (o.mapY != null ? (37.3051 - o.mapY * 0.0014) : null);
+        const lng = o.lng || (o.mapX != null ? (126.9736 + o.mapX * 0.0024) : null);
+        return !!(lat && lng);
+      })
+      .sort(([, a], [, b]) => b.timestamp - a.timestamp)
+      .map(([id, obs]) => ({ id, obs }));
+
     clsObs.forEach(([id, obs]) => {
       const lat = obs.lat || (obs.mapY != null ? (37.3051 - obs.mapY * 0.0014) : null);
       const lng = obs.lng || (obs.mapX != null ? (126.9736 + obs.mapX * 0.0024) : null);
@@ -1906,7 +1949,7 @@ function renderClassView() {
           radius: 11, color, fillColor: color, fillOpacity: 0.9, weight: 2.5
         });
       }
-      m.on('click', () => openModal(id, obs));
+      m.on('click', () => openModal(id, obs, classPinList));
       m.bindTooltip(label, { direction: 'top', permanent: false });
       m.addTo(classMapL);
       obsMarkersClass.push(m);
@@ -1994,7 +2037,9 @@ function renderClassView() {
     return;
   }
   list.innerHTML = '';
-  clsObs.sort(([,a],[,b]) => b.timestamp - a.timestamp).forEach(([id, obs]) => {
+  const sortedClsObs = clsObs.slice().sort(([,a],[,b]) => b.timestamp - a.timestamp);
+  const clsCardList = sortedClsObs.map(([id, obs]) => ({ id, obs }));
+  sortedClsObs.forEach(([id, obs]) => {
     const zone = ZONES.find(z => z.id === obs.location);
     const card = document.createElement('div');
     card.className = 'obs-card';
@@ -2018,7 +2063,7 @@ function renderClassView() {
           <button class="obs-card-del" onclick="confirmDelete('${id}','${safeSpecies}')" title="삭제">🗑️</button>
           <button style="background:transparent;font-size:15px;padding:4px;color:${obs.locked ? 'var(--pri)' : 'var(--txt2)'};" onclick="toggleLock('${id}',${!!obs.locked})" title="${obs.locked ? '잠금 해제' : '잠그기'}">${obs.locked ? '🔒' : '🔓'}</button>
         </div>` : ''}`;
-    card.querySelector('.obs-card-body').onclick = () => openModal(id, obs);
+    card.querySelector('.obs-card-body').onclick = () => openModal(id, obs, clsCardList);
     list.appendChild(card);
   });
 }
@@ -2107,7 +2152,27 @@ async function deleteObs(id) {
 }
 
 /* ──── Modal ──── */
-function openModal(id, obs) {
+/* ──── Modal Navigation State ──── */
+let _modalList  = [];  // [{id, obs}] 현재 탐색 가능한 목록
+let _modalIdx   = 0;   // 현재 위치
+let _modalSwipeX = null;
+
+function openModal(id, obs, list) {
+  // list: [{id, obs}, ...] 전달 시 네비게이션 활성화
+  if (list && list.length > 1) {
+    _modalList = list;
+    _modalIdx  = list.findIndex(e => e.id === id);
+    if (_modalIdx < 0) _modalIdx = 0;
+  } else if (!list) {
+    // list 미전달 시 기존 목록 유지 (핀 클릭 시 컨텍스트 없으면 단독)
+    _modalList = [];
+    _modalIdx  = 0;
+  }
+  _renderModalContent(id, obs);
+  document.getElementById('modalBg').classList.add('open');
+}
+
+function _renderModalContent(id, obs) {
   const zone = ZONES.find(z => z.id === obs.location);
   const isLocked = !!obs.locked;
   const adminActions = adminMode ? `
@@ -2115,7 +2180,7 @@ function openModal(id, obs) {
       <button class="btn-edit" onclick="openEditModal('${id}')">✏️ 수정</button>
       <button class="btn-del" onclick="confirmDelete('${id}', '${obs.species}')">🗑️ 삭제</button>
     </div>
-    <button onclick="toggleLock('${id}',${isLocked})" style="width:100%;padding:9px;border-radius:8px;font-size:13px;font-weight:700;margin-top:8px;border:1.5px solid ${isLocked ? 'var(--pri)' : 'var(--bdr)'};background:${isLocked ? 'var(--surf2)' : 'var(--surf2)'};color:${isLocked ? 'var(--pri)' : 'var(--txt2)'};cursor:pointer;">
+    <button onclick="toggleLock('${id}',${isLocked})" style="width:100%;padding:9px;border-radius:8px;font-size:13px;font-weight:700;margin-top:8px;border:1.5px solid ${isLocked ? 'var(--pri)' : 'var(--bdr)'};background:var(--surf2);color:${isLocked ? 'var(--pri)' : 'var(--txt2)'};cursor:pointer;">
       ${isLocked ? '🔓 잠금 해제' : '🔒 잠그기 (학생 수정 불가)'}
     </button>` : '';
   document.getElementById('modalContent').innerHTML = `
@@ -2132,8 +2197,36 @@ function openModal(id, obs) {
       <div class="modal-time">${formatTime(obs.timestamp)}</div>
       ${adminActions}
     </div>`;
-  document.getElementById('modalBg').classList.add('open');
+  // 네비게이션 버튼 업데이트
+  const navRow     = document.getElementById('modalNavRow');
+  const prevBtn    = document.getElementById('modalPrevBtn');
+  const nextBtn    = document.getElementById('modalNextBtn');
+  const counter    = document.getElementById('modalNavCounter');
+  if (_modalList.length > 1) {
+    navRow.style.display = '';
+    prevBtn.disabled = _modalIdx <= 0;
+    nextBtn.disabled = _modalIdx >= _modalList.length - 1;
+    counter.textContent = `${_modalIdx + 1} / ${_modalList.length}`;
+  } else {
+    navRow.style.display = 'none';
+  }
 }
+
+function modalNav(dir) {
+  const next = _modalIdx + dir;
+  if (next < 0 || next >= _modalList.length) return;
+  _modalIdx = next;
+  const { id, obs } = _modalList[_modalIdx];
+  // 슬라이드 애니메이션
+  const content = document.getElementById('modalContent');
+  content.style.transition = 'opacity .15s';
+  content.style.opacity = '0';
+  setTimeout(() => {
+    _renderModalContent(id, obs);
+    content.style.opacity = '1';
+  }, 150);
+}
+window.modalNav = modalNav;
 
 /* ──── Tab Navigation ──── */
 function switchTab(tabId) {
@@ -2653,6 +2746,31 @@ window.confirmDelete = confirmDelete;
     img.src = src;
     lb.classList.add('open');
   };
+})();
+
+/* ──── 모달 스와이프 네비게이션 ──── */
+(function() {
+  const modal = document.getElementById('modal');
+  let sx = null;
+  modal.addEventListener('touchstart', e => {
+    sx = e.touches[0].clientX;
+  }, { passive: true });
+  modal.addEventListener('touchend', e => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    sx = null;
+    if (Math.abs(dx) < 50) return; // 너무 짧은 스와이프 무시
+    if (_modalList.length <= 1) return;
+    if (dx < 0) modalNav(1);   // 왼쪽 스와이프 → 다음
+    else         modalNav(-1); // 오른쪽 스와이프 → 이전
+  }, { passive: true });
+  // 키보드 좌우 화살표
+  document.addEventListener('keydown', e => {
+    const bg = document.getElementById('modalBg');
+    if (!bg.classList.contains('open')) return;
+    if (e.key === 'ArrowLeft')  modalNav(-1);
+    if (e.key === 'ArrowRight') modalNav(1);
+  });
 })();
 </script>
 </body>
