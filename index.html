@@ -604,6 +604,41 @@ textarea.inp { height: 80px; resize: none; }
   display: none;
 }
 .dup-warning.visible { display: block; }
+
+/* ───── 교사 현황판 (학급별 탭 상단) ───── */
+.progress-board {
+  background: var(--surf); border-radius: var(--r); padding: 14px 16px;
+  margin-bottom: 10px; box-shadow: var(--shadow);
+}
+.progress-board-title {
+  font-size: 12px; font-weight: 700; color: var(--txt2);
+  text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px;
+}
+.progress-class-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0; border-bottom: 1px solid var(--bdr);
+}
+.progress-class-row:last-child { border-bottom: none; }
+.progress-cls-name { font-size: 13px; font-weight: 600; color: var(--txt); min-width: 70px; }
+.progress-groups { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+.progress-grp-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600;
+  background: var(--surf2); color: var(--txt2); border: 1px solid var(--bdr);
+}
+.progress-grp-badge.done { background: var(--pri); color: #fff; border-color: var(--pri); }
+.progress-total {
+  font-family: 'DM Mono', monospace; font-size: 12px; color: var(--txt2);
+  min-width: 36px; text-align: right;
+}
+
+/* ───── 내 기록 수정 버튼 ───── */
+.mine-card-edit-btn {
+  display: block; width: calc(100% - 28px); margin: 0 14px 12px;
+  padding: 7px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  background: var(--surf2); color: var(--txt); border: 1px solid var(--bdr);
+  text-align: center; cursor: pointer;
+}
+.mine-card-edit-btn:active { background: var(--pri); color: #fff; border-color: var(--pri); }
 </style>
 </head>
 <body>
@@ -789,6 +824,8 @@ const FB_CONFIG = {
     <!-- ── Tab 3: 학급별 ── -->
     <div class="tab-pane" id="tab-class">
       <div class="class-wrap">
+        <!-- 교사 현황판 (전체 보기일 때만 표시) -->
+        <div id="progressBoard" class="progress-board" style="display:none;"></div>
         <div class="class-select-row">
           <label>학급 선택:</label>
           <select class="inp" id="classViewSel" style="max-width:180px;"></select>
@@ -1202,10 +1239,10 @@ function setupMapGesture(container, mapL) {
 
 /* ──── 위성 토글 ──── */
 let satelliteMode = false;
-const OSM_URL  = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+// CartoDB Voyager: 가독성 좋은 지도, 줌 19까지 타일 지원 (회색 화면 없음)
+const OSM_URL  = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
 const SAT_URL  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-// maxNativeZoom:17 → 줌 18 이상은 타일 업스케일 (gray/no-data 방지)
-const OSM_OPTS = { maxZoom: 21, maxNativeZoom: 19 };
+const OSM_OPTS = { maxZoom: 21, maxNativeZoom: 19, subdomains: 'abcd' };
 const SAT_OPTS = { maxZoom: 21, maxNativeZoom: 17 };
 
 let baseLayers = {}; // mapId → L.tileLayer
@@ -1263,7 +1300,7 @@ function setFormPin(lat, lng) {
   pinLat = lat; pinLng = lng;
   if (formMarker) { formMapL.removeLayer(formMarker); formMarker = null; }
   const pinIcon = L.divIcon({
-    html: `<svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+    html: `<svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" style="pointer-events:none;display:block;">
       <path d="M16 0C7.163 0 0 7.163 0 16C0 24 16 42 16 42C16 42 32 24 32 16C32 7.163 24.837 0 16 0Z" fill="#3B7A4A"/>
       <path d="M16 2C8.268 2 2 8.268 2 16C2 23 16 39 16 39C16 39 30 23 30 16C30 8.268 23.732 2 16 2Z" fill="#2E6039"/>
       <circle cx="16" cy="16" r="7" fill="white" opacity="0.95"/>
@@ -1668,7 +1705,8 @@ let _pinIconSeq = 0;
 function makePhotoIcon(photo, color) {
   const uid = 'pc' + (++_pinIconSeq);
   const svg = `<svg width="44" height="54" viewBox="0 0 44 54"
-      xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+      style="pointer-events:none;display:block;">
     <defs>
       <clipPath id="${uid}"><circle cx="22" cy="22" r="16"/></clipPath>
       <filter id="${uid}f" x="-30%" y="-20%" width="160%" height="160%">
@@ -1787,6 +1825,9 @@ function renderClassView() {
   const clsObs = currentGroupFilter === 'all'
     ? baseObs
     : baseObs.filter(([, o]) => o.group === currentGroupFilter);
+
+  // 교사 현황판 렌더
+  renderProgressBoard(isAll);
 
   // 조 필터 버튼 렌더
   renderGroupFilter(baseObs);
@@ -1921,6 +1962,57 @@ function renderClassView() {
     card.querySelector('.obs-card-body').onclick = () => openModal(id, obs);
     list.appendChild(card);
   });
+}
+
+/* ──── 교사 현황판 ──── */
+function renderProgressBoard(isAll) {
+  const board = document.getElementById('progressBoard');
+  if (!board) return;
+
+  if (!isAll) { board.style.display = 'none'; return; }
+
+  // 반별로 어떤 조가 기록했는지 집계
+  const CLASSES = [];
+  for (let c = 1; c <= 11; c++) CLASSES.push(`1학년 ${c}반`);
+  CLASSES.push('테스트반');
+
+  const ALL_GROUPS = ['1조','2조','3조','4조','5조','6조'];
+
+  const recorded = {}; // { '1학년 1반': Set(['1조','2조',...]) }
+  Object.values(observations).forEach(o => {
+    if (!o.class || !o.group) return;
+    if (!recorded[o.class]) recorded[o.class] = new Set();
+    recorded[o.class].add(o.group);
+  });
+
+  const presentClasses = CLASSES.filter(c => recorded[c]);
+  if (!presentClasses.length) { board.style.display = 'none'; return; }
+
+  const totalObs = Object.values(observations).length;
+  const classCount = presentClasses.length;
+
+  board.style.display = 'block';
+  board.innerHTML = `
+    <div class="progress-board-title">📋 반별 조 기록 현황
+      <span style="float:right;font-size:12px;color:var(--txt2);font-weight:400;">
+        ${classCount}개 반 / 총 ${totalObs}건
+      </span>
+    </div>
+    ${presentClasses.map(cls => {
+      const doneGroups = recorded[cls] || new Set();
+      const clsObs = Object.values(observations).filter(o => o.class === cls);
+      const color = classColor(cls);
+      return `<div class="progress-class-row">
+        <div class="progress-cls-name" style="color:${color};">${cls.replace('1학년 ','')}</div>
+        <div class="progress-groups">
+          ${ALL_GROUPS.map(g => {
+            const isDone = doneGroups.has(g);
+            return `<span class="progress-grp-badge${isDone ? ' done' : ''}">${g}</span>`;
+          }).join('')}
+        </div>
+        <div class="progress-total">${clsObs.length}건</div>
+      </div>`;
+    }).join('')}`;
 }
 
 /* ──── Group Filter Chips ──── */
@@ -2249,7 +2341,14 @@ function lookupMine() {
         ${obs.notes ? `<div class="mine-card-notes">${obs.notes}</div>` : ''}
         <div class="mine-card-time">${formatTime(obs.timestamp)}</div>
       </div>`;
-    card.onclick = () => openModal(id, obs);
+    // 내 기록 수정 버튼 (본인 학번으로 조회한 경우만 표시)
+    const editBtn = document.createElement('button');
+    editBtn.className = 'mine-card-edit-btn';
+    editBtn.textContent = '✏️ 수정';
+    editBtn.onclick = (e) => { e.stopPropagation(); openEditModal(id); };
+    card.appendChild(editBtn);
+
+    card.querySelector('.mine-card-body').onclick = () => openModal(id, obs);
     grid.appendChild(card);
   });
   list.appendChild(grid);
