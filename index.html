@@ -1239,10 +1239,10 @@ function setupMapGesture(container, mapL) {
 
 /* ──── 위성 토글 ──── */
 let satelliteMode = false;
-// CartoDB Voyager: 가독성 좋은 지도, 줌 19까지 타일 지원 (회색 화면 없음)
-const OSM_URL  = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
+// OpenStreetMap — API 키 불필요, maxNativeZoom:19 설정으로 회색 화면 방지
+const OSM_URL  = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const SAT_URL  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const OSM_OPTS = { maxZoom: 21, maxNativeZoom: 19, subdomains: 'abcd' };
+const OSM_OPTS = { maxZoom: 21, maxNativeZoom: 19 };
 const SAT_OPTS = { maxZoom: 21, maxNativeZoom: 17 };
 
 let baseLayers = {}; // mapId → L.tileLayer
