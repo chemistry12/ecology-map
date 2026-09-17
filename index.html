@@ -1250,6 +1250,16 @@ function onData() {
   renderMapPins();
   renderClassView();
   if (classMapL) classMapL.invalidateSize();
+  // 내 기록 탭이 열려있으면 자동 갱신
+  const minePane = document.getElementById('tab-mine');
+  if (minePane && minePane.classList.contains('active')) {
+    if (adminMode) {
+      renderAllStudentRecords();
+    } else {
+      const sid = document.getElementById('mineStudentId')?.value?.trim();
+      if (sid) lookupMine();
+    }
+  }
 }
 
 /* ──── Leaflet Map Init ──── */
