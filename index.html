@@ -721,7 +721,7 @@ textarea.inp { height: 80px; resize: none; }
       <div class="step-body">
         <strong>index.html에 URL 붙여넣기</strong>
         <p>메모장 또는 VS Code로 <code>index.html</code> 열기 → <code>GAS_URL</code>을 찾아 복사한 URL로 교체</p>
-        <div class="setup-code">const GAS_URL = 'https://script.google.com/macros/s/AKfycbwkWc4HYfTPmvO58Sz2SSROgl6Y6UNF4_7HXByIoAyXtXgC3EJPQrJAbw50aTziHH2aoA/exec';</div>
+        <div class="setup-code">const GAS_URL = '복사한 배포 URL을 여기에';</div>
       </div>
     </div>
 
@@ -986,7 +986,7 @@ textarea.inp { height: 80px; resize: none; }
 /* ══════════════════════════════════════════════
    🔧 APPS SCRIPT 설정 — 배포 URL을 여기에 붙여넣기
    ══════════════════════════════════════════════ */
-const GAS_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwkWc4HYfTPmvO58Sz2SSROgl6Y6UNF4_7HXByIoAyXtXgC3EJPQrJAbw50aTziHH2aoA/exec';
 /* ══════════════════════════════════════════════ */
 
 /* ──── Constants ──── */
@@ -2660,8 +2660,8 @@ function renderAllStudentRecords() {
   const count = document.getElementById('mineCount');
   const list  = document.getElementById('mineList');
   const all   = Object.entries(observations).sort(([, a], [, b]) => {
-    const sa = (a.studentId || ' ').padStart(10, '0');
-    const sb = (b.studentId || ' ').padStart(10, '0');
+    const sa = (a.studentId || '￿').padStart(10, '0');
+    const sb = (b.studentId || '￿').padStart(10, '0');
     return sa < sb ? -1 : sa > sb ? 1 : (b.timestamp - a.timestamp);
   });
 
