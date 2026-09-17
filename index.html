@@ -864,6 +864,7 @@ textarea.inp { height: 80px; resize: none; }
           <select class="inp" id="classViewSel" style="max-width:180px;"></select>
           <button id="lockAllClassBtn" onclick="lockAll('class')" style="display:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;">🔒 전체 잠금</button>
           <button id="unlockAllClassBtn" onclick="unlockAll('class')" style="display:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;">🔓 전체 해제</button>
+          <button id="deleteClassBtn" onclick="deleteClassAll()" style="display:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:#FFF0EE;border:1.5px solid #E57373;color:#C62828;cursor:pointer;">🗑️ 이 반 전체 삭제</button>
         </div>
         <div class="group-filter-row" id="groupFilterRow"></div>
         <div style="position:relative;">
@@ -1619,7 +1620,7 @@ window.clearStudentInfo = clearStudentInfo;
 
 /* 반 번호 → 학번 접두사 (1반→101, 10반→110) / 테스트반은 null 반환 → 제한 없음 */
 function expectedSidPrefix(classStr) {
-  if (!classStr || classStr === '테스트반') return null; // 테스트반: 학번 제한 없음
+  if (!classStr || classStr === '테스트반' || classStr === '1학년 12반(테스트)') return null; // 테스트 반: 학번 제한 없음
   const m = classStr.match(/(\d+)반$/);
   if (!m) return null;
   const num = parseInt(m[1], 10);
@@ -1628,7 +1629,7 @@ function expectedSidPrefix(classStr) {
 
 function validateStudentId(cls, sid) {
   if (!sid) return null;
-  if (cls === '테스트반') return null; // 테스트반: 형식 검증 생략
+  if (cls === '테스트반' || cls === '1학년 12반(테스트)') return null; // 테스트 반: 형식 검증 생략
   const prefix = expectedSidPrefix(cls);
   if (!prefix) return null;
   if (!sid.startsWith(prefix)) {
@@ -1869,7 +1870,7 @@ function renderMapPins() {
 
 function renderClassFilterChips() {
   const classesPresent = [...new Set(Object.values(observations).map(o => o.class))]
-    .filter(c => adminMode || c !== '테스트반')
+    .filter(c => adminMode || (c !== '테스트반' && c !== '1학년 12반(테스트)'))
     .sort();
   const wrap = document.getElementById('classFilterChips');
   if (!wrap) return;
@@ -2090,7 +2091,10 @@ function renderProgressBoard(isAll) {
   // 반별로 어떤 조가 기록했는지 집계
   const CLASSES = [];
   for (let c = 1; c <= 11; c++) CLASSES.push(`1학년 ${c}반`);
-  if (adminMode) CLASSES.push('테스트반'); // 관리자 모드에서만 표시
+  if (adminMode) {
+    CLASSES.push('1학년 12반(테스트)'); // 관리자 모드에서만 표시
+    CLASSES.push('테스트반');           // 관리자 모드에서만 표시
+  }
 
   const ALL_GROUPS = ['1조','2조','3조','4조','5조','6조'];
 
@@ -2359,22 +2363,31 @@ function updateAdminUI() {
   // 테스트반 옵션 — 관리자 모드일 때만 표시
   const selClass  = document.getElementById('selClass');
   const viewSel   = document.getElementById('classViewSel');
+  // 관리자 전용 반 옵션 (테스트반, 12반(테스트)) 토글
+  const ADMIN_CLASSES = [
+    { value: '1학년 12반(테스트)', label: '🧪 1학년 12반(테스트)' },
+    { value: '테스트반',            label: '🧪 테스트반' },
+  ];
   ['selClass', 'classViewSel'].forEach(selId => {
     const sel = document.getElementById(selId);
     if (!sel) return;
-    const existing = sel.querySelector('option[value="테스트반"]');
-    if (adminMode && !existing) {
-      sel.appendChild(new Option('🧪 테스트반', '테스트반'));
-    } else if (!adminMode && existing) {
-      existing.remove();
-    }
+    ADMIN_CLASSES.forEach(({ value, label }) => {
+      const existing = sel.querySelector(`option[value="${value}"]`);
+      if (adminMode && !existing) {
+        sel.appendChild(new Option(label, value));
+      } else if (!adminMode && existing) {
+        existing.remove();
+      }
+    });
   });
 
-  // 학급별 탭 전체 잠금 / 전체 해제 버튼
+  // 학급별 탭 전체 잠금 / 전체 해제 / 반 전체 삭제 버튼
   const lockClassBtn   = document.getElementById('lockAllClassBtn');
   const unlockClassBtn = document.getElementById('unlockAllClassBtn');
+  const deleteClassBtn = document.getElementById('deleteClassBtn');
   if (lockClassBtn)   lockClassBtn.style.display   = adminMode ? '' : 'none';
   if (unlockClassBtn) unlockClassBtn.style.display = adminMode ? '' : 'none';
+  if (deleteClassBtn) deleteClassBtn.style.display = adminMode ? '' : 'none';
   // 현재 내 기록 탭이 열려있으면 새로고침
   const minePane = document.getElementById('tab-mine');
   if (minePane && minePane.classList.contains('active')) {
@@ -2608,6 +2621,28 @@ async function unlockAll(scope) {
   } catch(e) { toast('❌ 오류: ' + e.message); }
 }
 window.unlockAll = unlockAll;
+
+/* ──── 이 반 기록 전체 삭제 ──── */
+async function deleteClassAll() {
+  if (!adminMode) { toast('🔒 관리자만 삭제할 수 있어요'); return; }
+  const cls = document.getElementById('classViewSel').value;
+  if (!cls || cls === '__all__') { toast('삭제할 반을 먼저 선택하세요'); return; }
+  const targets = Object.entries(observations).filter(([, o]) => o.class === cls);
+  if (targets.length === 0) { toast('해당 반 기록이 없어요'); return; }
+  if (!confirm(`"${cls}" 기록 ${targets.length}개를 전부 삭제할까요?\n되돌릴 수 없습니다.`)) return;
+  try {
+    // 순차 삭제 (Apps Script 부하 방지)
+    for (const [id] of targets) {
+      await gasAPI('delete', { id });
+      delete observations[id];
+    }
+    onData();
+    toast(`🗑️ "${cls}" 기록 ${targets.length}개 삭제 완료`);
+  } catch(e) {
+    toast('❌ 삭제 중 오류: ' + e.message);
+  }
+}
+window.deleteClassAll = deleteClassAll;
 
 /* ──── 내 기록 공용 카드 생성 (obs-card 스타일) ──── */
 function makeMineObsCard(id, obs, isAdmin) {
