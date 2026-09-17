@@ -839,22 +839,7 @@ textarea.inp { height: 80px; resize: none; }
       </div>
     </div>
 
-    <!-- ── Tab 2: 생태지도 ── -->
-    <div class="tab-pane" id="tab-map">
-      <div class="map-controls">
-        <span class="filter-label">학급:</span>
-        <button class="filter-chip active" data-filter="all">전체</button>
-        <div id="classFilterChips" style="display:contents;"></div>
-      </div>
-      <div class="map-wrap" style="position:relative;">
-        <div class="map-container" id="mainMapContainer" style="height:320px;">
-          <button class="map-fs-btn" id="mainFsBtn" title="전체화면" onclick="toggleMapFs('main')">⛶</button>
-        </div>
-      </div>
-      <div class="legend" id="mapLegend"></div>
-    </div>
-
-    <!-- ── Tab 3: 학급별 ── -->
+    <!-- ── Tab 2: 모아보기 (구 학급별) ── -->
     <div class="tab-pane" id="tab-class">
       <div class="class-wrap">
         <!-- 교사 현황판 (전체 보기일 때만 표시) -->
@@ -902,11 +887,8 @@ textarea.inp { height: 80px; resize: none; }
     <button class="nav-btn active" data-tab="tab-record">
       <span class="nav-icon">📝</span>기록하기
     </button>
-    <button class="nav-btn" data-tab="tab-map">
-      <span class="nav-icon">🗺️</span>생태지도
-    </button>
     <button class="nav-btn" data-tab="tab-class">
-      <span class="nav-icon">📊</span>학급별
+      <span class="nav-icon">🗺️</span>모아보기
     </button>
     <button class="nav-btn" data-tab="tab-mine">
       <span class="nav-icon">🧑</span>내 기록
@@ -923,7 +905,7 @@ textarea.inp { height: 80px; resize: none; }
     <div class="success-meta" id="successMetaText"></div>
     <div class="success-total" id="successTotalText"></div>
     <button class="success-next" onclick="closeSuccess()">다음 생물 기록하기 →</button>
-    <button class="success-view" onclick="closeSuccess();switchTab('tab-map')">🗺️ 생태지도에서 보기</button>
+    <button class="success-view" onclick="closeSuccess();switchTab('tab-class')">🗺️ 모아보기에서 확인</button>
   </div>
 </div>
 
@@ -2273,10 +2255,6 @@ function switchTab(tabId) {
   document.getElementById(tabId).classList.add('active');
   document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
 
-  if (tabId === 'tab-map') {
-    initMainMap();
-    setTimeout(() => { if (mainMapL) { mainMapL.invalidateSize(); renderMapPins(); } }, 150);
-  }
   if (tabId === 'tab-mine') {
     const studentRow = document.getElementById('mineStudentRow');
     const adminRow   = document.getElementById('mineAdminRow');
