@@ -1192,27 +1192,21 @@ function bindStudentIdValidation() {
     if (!cls || !sid) { hint.textContent = ''; return; }
     const prefix = expectedSidPrefix(cls);
     if (!prefix) { hint.textContent = ''; return; }
-    const inpName = document.getElementById('inpName');
     if (!sid.startsWith(prefix)) {
       hint.style.color = 'var(--danger, #e53)';
       hint.textContent = `❌ ${cls}은 ${prefix}○○ 형식이어야 해요`;
-      if (inpName) { inpName.value = ''; inpName.readOnly = false; inpName.style.background = ''; }
     } else if (!/^\d{5}$/.test(sid)) {
       hint.style.color = 'var(--danger, #e53)';
       hint.textContent = '❌ 숫자 5자리로 입력하세요';
-      if (inpName) { inpName.value = ''; inpName.readOnly = false; inpName.style.background = ''; }
     } else if (STUDENT_ROSTER && !STUDENT_ROSTER[sid]) {
       hint.style.color = 'var(--danger, #e53)';
       hint.textContent = '❌ 명단에 없는 학번이에요. 다시 확인해주세요';
-      if (inpName) { inpName.value = ''; inpName.readOnly = false; inpName.style.background = ''; }
     } else if (STUDENT_ROSTER && STUDENT_ROSTER[sid]) {
       hint.style.color = 'var(--pri)';
       hint.textContent = `✅ ${STUDENT_ROSTER[sid]} 학생 확인됨`;
-      if (inpName) {
-        inpName.value = STUDENT_ROSTER[sid];
-        inpName.readOnly = true;
-        inpName.style.background = 'var(--surf2)';
-      }
+      // 이름 자동완성 (한 번만, 이미 입력된 경우 덮어쓰기)
+      const inpName = document.getElementById('inpName');
+      if (inpName) inpName.value = STUDENT_ROSTER[sid];
     } else {
       hint.style.color = 'var(--pri)';
       hint.textContent = '✅ 학번 형식 확인됨';
@@ -1220,21 +1214,6 @@ function bindStudentIdValidation() {
   }
   inpSid.addEventListener('input', checkSid);
   selClass.addEventListener('change', checkSid);
-
-  // 이름 칸 — 명단 학번이면 입력 차단
-  const inpNameEl = document.getElementById('inpName');
-  if (inpNameEl) {
-    inpNameEl.addEventListener('beforeinput', (e) => {
-      const sid = inpSid.value.trim();
-      if (STUDENT_ROSTER && STUDENT_ROSTER[sid]) e.preventDefault();
-    });
-    inpNameEl.addEventListener('input', () => {
-      const sid = inpSid.value.trim();
-      if (STUDENT_ROSTER && STUDENT_ROSTER[sid]) {
-        inpNameEl.value = STUDENT_ROSTER[sid];
-      }
-    });
-  }
 }
 
 /* ──── Google Apps Script API ──── */
