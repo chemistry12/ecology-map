@@ -1229,7 +1229,7 @@ async function fetchAll() {
     return;
   }
   try {
-    const res  = await fetch(GAS_URL);
+    const res  = await fetch(GAS_URL, { redirect: 'follow' });
     const data = await res.json();
     if (data && data._error) throw new Error(data._error);
     observations = data || {};
@@ -2732,7 +2732,7 @@ window.renderAllStudentRecords = renderAllStudentRecords;
 function lookupMine() {
   const sid   = document.getElementById('mineStudentId').value.trim();
   if (!sid) { toast('학번을 입력하세요.'); return; }
-  const myObs = Object.entries(observations).filter(([, o]) => o.studentId === sid);
+  const myObs = Object.entries(observations).filter(([, o]) => String(o.studentId) === sid);
   const count = document.getElementById('mineCount');
   const list  = document.getElementById('mineList');
 
