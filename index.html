@@ -689,52 +689,39 @@ textarea.inp { height: 80px; resize: none; }
 <div id="setup" style="display:none;">
   <div class="setup-card">
     <div class="setup-logo">🌿</div>
-    <div class="setup-title">영생고 생태지도 — Firebase 설정 필요</div>
-    <div class="setup-sub">아래 안내를 따라 Firebase를 연결하면 학생들이 바로 사용할 수 있어요!</div>
+    <div class="setup-title">영생고 생태지도 — Apps Script 설정 필요</div>
+    <div class="setup-sub">Google Sheets + Apps Script를 연결하면 학생들이 바로 사용할 수 있어요!</div>
 
     <div class="setup-step">
       <div class="step-num">1</div>
       <div class="step-body">
-        <strong>Firebase 프로젝트 만들기</strong>
-        <p><a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> 접속 → <b>프로젝트 만들기</b> → 이름 입력 (예: <code>yeongsaeng-ecology</code>) → Google 애널리틱스 비활성화 → 만들기</p>
+        <strong>Google Sheets 새 파일 만들기</strong>
+        <p><a href="https://sheets.new" target="_blank">sheets.new</a> 접속 → 파일 이름 입력 (예: <code>영생고 생태지도 DB</code>)</p>
       </div>
     </div>
 
     <div class="setup-step">
       <div class="step-num">2</div>
       <div class="step-body">
-        <strong>Realtime Database 활성화</strong>
-        <p>왼쪽 메뉴 → <b>빌드 → Realtime Database</b> → 데이터베이스 만들기 → 지역: <b>asia-southeast1</b> → 보안 규칙: <b>테스트 모드로 시작</b> → 사용 설정</p>
+        <strong>Apps Script 편집기 열기</strong>
+        <p>상단 메뉴 → <b>확장 프로그램 → Apps Script</b> → 기존 내용 전체 삭제 → <b>gas_backend.gs</b> 파일의 내용 붙여넣기 → 💾 저장</p>
       </div>
     </div>
 
     <div class="setup-step">
       <div class="step-num">3</div>
       <div class="step-body">
-        <strong>웹 앱 구성 값 복사하기</strong>
-        <p>프로젝트 개요 → 웹 아이콘 <code>&lt;/&gt;</code> 클릭 → 앱 닉네임 입력 → 등록 → <b>firebaseConfig</b> 내용 복사</p>
-        <div class="setup-code">const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "your-project.firebaseapp.com",
-  databaseURL: "https://your-project-rtdb.asia-southeast1...",
-  projectId: "your-project",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123"
-};</div>
+        <strong>웹 앱으로 배포</strong>
+        <p>Apps Script 편집기 우측 상단 → <b>배포 → 새 배포</b> → 유형: <b>웹 앱</b> 선택 → 실행 계정: <b>나</b> → 액세스 권한: <b>모든 사용자(익명 포함)</b> → 배포 → URL 복사</p>
       </div>
     </div>
 
     <div class="setup-step">
       <div class="step-num">4</div>
       <div class="step-body">
-        <strong>index.html 파일에 붙여넣기</strong>
-        <p>메모장 또는 VS Code로 <code>index.html</code> 열기 → 파일 상단에서 <code>FB_CONFIG</code>를 찾아 복사한 값으로 교체</p>
-        <div class="setup-code">// ← 이 부분을 찾아서 교체하세요
-const FB_CONFIG = {
-  apiKey: "여기에 복사한 값",
-  ...
-};</div>
+        <strong>index.html에 URL 붙여넣기</strong>
+        <p>메모장 또는 VS Code로 <code>index.html</code> 열기 → <code>GAS_URL</code>을 찾아 복사한 URL로 교체</p>
+        <div class="setup-code">const GAS_URL = 'https://script.google.com/macros/s/AKfycbwkWc4HYfTPmvO58Sz2SSROgl6Y6UNF4_7HXByIoAyXtXgC3EJPQrJAbw50aTziHH2aoA/exec';</div>
       </div>
     </div>
 
@@ -742,13 +729,12 @@ const FB_CONFIG = {
       <div class="step-num">5</div>
       <div class="step-body">
         <strong>GitHub Pages에 업로드</strong>
-        <p>GitHub → 새 저장소 → 이름: <code>ecology-map</code> → <b>index.html</b> 업로드 → Settings → Pages → Branch: <b>main</b> → Save → URL 학생들에게 공유!</p>
+        <p>GitHub → 저장소에 <b>index.html</b> 업로드 → Settings → Pages → Branch: <b>main</b> → Save → URL 학생들에게 공유!</p>
       </div>
     </div>
 
     <div class="setup-warning">
-      ⚠️ <b>Firebase 무료 티어 보안 주의:</b> 테스트 모드는 30일 후 자동 만료됩니다. 이후 Realtime Database → 규칙 탭에서 아래 규칙을 붙여넣어 읽기/쓰기를 유지하세요:<br><br>
-      <code>{ "rules": { ".read": true, ".write": true } }</code>
+      ⚠️ <b>Apps Script 배포 주의:</b> 코드를 수정하면 반드시 <b>새 배포</b>를 생성하거나 기존 배포를 <b>버전 업데이트</b>해야 변경사항이 적용됩니다. 배포 URL은 그대로 유지됩니다.
     </div>
   </div>
 </div>
@@ -992,25 +978,15 @@ const FB_CONFIG = {
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<!-- Firebase SDKs 제거됨 — Google Apps Script 사용 -->
 
 <script>
 'use strict';
 
 /* ══════════════════════════════════════════════
-   🔧 FIREBASE 설정 — 여기를 교체하세요
+   🔧 APPS SCRIPT 설정 — 배포 URL을 여기에 붙여넣기
    ══════════════════════════════════════════════ */
-const FB_CONFIG = {
-  apiKey:            "AIzaSyBSTeg09a4Yi6H93QI37GLR5ojTKPOvXVI",
-  authDomain:        "yeongsaeng-ecology.firebaseapp.com",
-  databaseURL:       "https://yeongsaeng-ecology-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:         "yeongsaeng-ecology",
-  storageBucket:     "yeongsaeng-ecology.firebasestorage.app",
-  messagingSenderId: "890745613713",
-  appId:             "1:890745613713:web:992ef138200e8849457e30"
-};
+const GAS_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL';
 /* ══════════════════════════════════════════════ */
 
 /* ──── Constants ──── */
@@ -1063,7 +1039,7 @@ const COMMON_SPECIES = [
 
 /* ──── State ──── */
 let observations = {};
-let obsRef = null;
+let pollingTimer = null;  // Apps Script 30초 폴링
 let selectedZone = null;
 let pinLat = null, pinLng = null;
 let formMapL = null, mainMapL = null, classMapL = null;
@@ -1081,7 +1057,7 @@ let currentGroupFilter = 'all';
 
 /* ──── Boot ──── */
 window.addEventListener('DOMContentLoaded', () => {
-  if (FB_CONFIG.apiKey === 'YOUR_API_KEY') {
+  if (!GAS_URL || GAS_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
     document.getElementById('setup').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
     return;
@@ -1230,38 +1206,44 @@ function bindStudentIdValidation() {
   selClass.addEventListener('change', checkSid);
 }
 
-/* ──── Firebase ──── */
+/* ──── Google Apps Script API ──── */
 
-function initFirebase() {
-  try {
-    firebase.initializeApp(FB_CONFIG);
-    obsRef = firebase.database().ref('observations');
-
-    // 최초 1회 전체 다운로드
-    obsRef.once('value', snap => {
-      observations = snap.val() || {};
-      onData();
-
-      // 이후에는 변경된 레코드만 개별 수신 (전체 재다운로드 방지)
-      obsRef.on('child_added', snap => {
-        if (observations[snap.key]) return; // 이미 있는 데이터 무시
-        observations[snap.key] = snap.val();
-        onData();
-      });
-      obsRef.on('child_changed', snap => {
-        observations[snap.key] = snap.val();
-        onData();
-      });
-      obsRef.on('child_removed', snap => {
-        delete observations[snap.key];
-        onData();
-      });
-    }, err => {
-      toast('❌ DB 연결 오류: ' + err.message);
-    });
-  } catch(e) {
-    toast('❌ Firebase 초기화 오류: ' + e.message);
+/* 공통 API 호출 */
+async function gasAPI(action, params = {}) {
+  if (!GAS_URL || GAS_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+    throw new Error('GAS_URL이 설정되지 않았습니다. index.html 상단에 Apps Script 배포 URL을 입력하세요.');
   }
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action, ...params }),
+  });
+  const json = await res.json();
+  if (json && json.error) throw new Error(json.error);
+  return json;
+}
+
+/* 전체 데이터 가져오기 (GET) */
+async function fetchAll() {
+  if (!GAS_URL || GAS_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
+    toast('⚠️ GAS_URL을 설정하세요 (index.html 상단)');
+    return;
+  }
+  try {
+    const res  = await fetch(GAS_URL);
+    const data = await res.json();
+    if (data && data._error) throw new Error(data._error);
+    observations = data || {};
+    onData();
+  } catch(e) {
+    toast('❌ DB 연결 오류: ' + e.message);
+  }
+}
+
+/* Apps Script 초기화 & 30초 폴링 시작 */
+function initFirebase() {   // 함수명 유지 (호출부 변경 불필요)
+  fetchAll();
+  if (pollingTimer) clearInterval(pollingTimer);
+  pollingTimer = setInterval(fetchAll, 30000);
 }
 
 function onData() {
@@ -1705,7 +1687,12 @@ async function handleSubmit() {
       notes:     notes,
       timestamp: Date.now(),
     };
-    await obsRef.push(data);
+    const result = await gasAPI('add', { data });
+    // 로컬 캐시에 즉시 반영 (폴링 전까지 UI에 표시)
+    if (result && result.id) {
+      observations[result.id] = data;
+      onData();
+    }
     saveStudentInfo(cls, grp, sid, name);
     const banner = document.getElementById('studentFixedBanner');
     if (banner) banner.style.display = 'flex';
@@ -2169,7 +2156,9 @@ async function deleteObs(id) {
   if (!adminMode) { toast('🔒 관리자만 삭제할 수 있어요'); return; }
   if (!confirm('이 기록을 삭제할까요?')) return;
   try {
-    await obsRef.child(id).remove();
+    await gasAPI('delete', { id });
+    delete observations[id];
+    onData();
     toast('🗑️ 삭제되었습니다');
   } catch(e) {
     toast('❌ 삭제 실패: ' + e.message);
@@ -2511,8 +2500,8 @@ function openEditModal(id) {
   document.getElementById('editModalBg').classList.add('open');
 }
 
-function saveEdit() {
-  if (!editingId || !obsRef) return;
+async function saveEdit() {
+  if (!editingId) return;
   const species  = document.getElementById('editSpecies').value.trim();
   const notes    = document.getElementById('editNotes').value.trim();
   const location = document.getElementById('editLocation').value;
@@ -2527,19 +2516,27 @@ function saveEdit() {
     if (sid)  updates.studentId = sid;
     if (name) updates.name = name;
   }
-  obsRef.child(editingId).update(updates, err => {
-    if (err) { toast('❌ 저장 실패: ' + err.message); return; }
+  try {
+    await gasAPI('update', { id: editingId, data: updates });
+    // 로컬 캐시 즉시 반영
+    if (observations[editingId]) {
+      Object.assign(observations[editingId], updates);
+      onData();
+    }
     toast('✅ 수정 완료');
     document.getElementById('editModalBg').classList.remove('open');
     editingId = null;
-  });
+  } catch(err) {
+    toast('❌ 저장 실패: ' + err.message);
+  }
 }
 
 /* ──── Lock / Unlock ──── */
 async function toggleLock(id, currentlyLocked) {
   if (!adminMode) { toast('🔒 관리자만 잠금 설정할 수 있어요'); return; }
   try {
-    await obsRef.child(id).update({ locked: !currentlyLocked });
+    await gasAPI('update', { id, data: { locked: !currentlyLocked } });
+    if (observations[id]) { observations[id].locked = !currentlyLocked; onData(); }
     document.getElementById('modalBg').classList.remove('open');
     toast(currentlyLocked ? '🔓 잠금이 해제됐어요' : '🔒 잠겼어요 — 학생이 수정할 수 없어요');
   } catch(e) {
@@ -2549,21 +2546,24 @@ async function toggleLock(id, currentlyLocked) {
 window.toggleLock = toggleLock;
 
 /* ──── Delete Record ──── */
-function confirmDelete(id, species) {
+async function confirmDelete(id, species) {
   if (!adminMode) { toast('🔒 관리자만 삭제할 수 있어요'); return; }
   if (!confirm(`"${species}" 기록을 삭제할까요?`)) return;
   document.getElementById('modalBg').classList.remove('open');
-  obsRef.child(id).remove(err => {
-    if (err) { toast('❌ 삭제 실패: ' + err.message); return; }
+  try {
+    await gasAPI('delete', { id });
+    delete observations[id];
+    onData();
     toast('🗑️ 삭제 완료');
-  });
+  } catch(err) {
+    toast('❌ 삭제 실패: ' + err.message);
+  }
 }
 
 /* ──── My Records ──── */
 /* ──── 전체 잠금 ──── */
 async function lockAll(scope) {
   if (!adminMode) { toast('🔒 관리자만 잠금 설정할 수 있어요'); return; }
-  if (!obsRef) return;
   let targets;
   if (scope === 'class') {
     const cls = document.getElementById('classViewSel').value;
@@ -2575,9 +2575,11 @@ async function lockAll(scope) {
   }
   if (targets.length === 0) { toast('잠글 기록이 없어요'); return; }
   const updates = {};
-  targets.forEach(([id]) => { updates[id + '/locked'] = true; });
+  targets.forEach(([id]) => { updates[id] = { locked: true }; });
   try {
-    await obsRef.update(updates);
+    await gasAPI('updateMany', { updates });
+    targets.forEach(([id]) => { if (observations[id]) observations[id].locked = true; });
+    onData();
     toast(`🔒 ${targets.length}개 기록이 잠겼어요`);
   } catch(e) { toast('❌ 오류: ' + e.message); }
 }
@@ -2586,7 +2588,6 @@ window.lockAll = lockAll;
 /* ──── 전체 잠금 해제 ──── */
 async function unlockAll(scope) {
   if (!adminMode) { toast('🔒 관리자만 잠금 해제할 수 있어요'); return; }
-  if (!obsRef) return;
   let targets;
   if (scope === 'class') {
     const cls = document.getElementById('classViewSel').value;
@@ -2598,9 +2599,11 @@ async function unlockAll(scope) {
   }
   if (targets.length === 0) { toast('해제할 기록이 없어요'); return; }
   const updates = {};
-  targets.forEach(([id]) => { updates[id + '/locked'] = false; });
+  targets.forEach(([id]) => { updates[id] = { locked: false }; });
   try {
-    await obsRef.update(updates);
+    await gasAPI('updateMany', { updates });
+    targets.forEach(([id]) => { if (observations[id]) observations[id].locked = false; });
+    onData();
     toast(`🔓 ${targets.length}개 기록 잠금이 해제됐어요`);
   } catch(e) { toast('❌ 오류: ' + e.message); }
 }
@@ -2657,8 +2660,8 @@ function renderAllStudentRecords() {
   const count = document.getElementById('mineCount');
   const list  = document.getElementById('mineList');
   const all   = Object.entries(observations).sort(([, a], [, b]) => {
-    const sa = (a.studentId || '￿').padStart(10, '0');
-    const sb = (b.studentId || '￿').padStart(10, '0');
+    const sa = (a.studentId || ' ').padStart(10, '0');
+    const sb = (b.studentId || ' ').padStart(10, '0');
     return sa < sb ? -1 : sa > sb ? 1 : (b.timestamp - a.timestamp);
   });
 
