@@ -395,7 +395,25 @@ textarea.inp { height: 80px; resize: none; }
   .modal-bg.open .modal { transform: scale(1) translateY(0); }
   .modal-close { border-radius: 0 0 16px 16px; }
 }
-.modal-img { width: 100%; height: 220px; object-fit: cover; }
+.modal-img { width: 100%; height: 220px; object-fit: cover; cursor: zoom-in; }
+@media (min-width: 640px) {
+  .modal-img { height: clamp(260px, 45vh, 480px); }
+}
+/* 라이트박스 */
+#imgLightbox {
+  position: fixed; inset: 0; background: rgba(0,0,0,.92);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 99000; opacity: 0; pointer-events: none;
+  transition: opacity .2s; cursor: zoom-out;
+}
+#imgLightbox.open { opacity: 1; pointer-events: auto; }
+#imgLightbox img {
+  max-width: 96vw; max-height: 92vh;
+  border-radius: 8px; object-fit: contain;
+  box-shadow: 0 8px 48px rgba(0,0,0,.6);
+  transform: scale(.94); transition: transform .2s;
+}
+#imgLightbox.open img { transform: scale(1); }
 .modal-body { padding: 20px; }
 .modal-species { font-size: 22px; font-weight: 700; }
 .modal-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
@@ -836,6 +854,7 @@ const FB_CONFIG = {
         <div class="class-select-row">
           <label>학급 선택:</label>
           <select class="inp" id="classViewSel" style="max-width:180px;"></select>
+          <button id="lockAllClassBtn" onclick="lockAll('class')" style="display:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;">🔒 전체 잠금</button>
         </div>
         <div class="group-filter-row" id="groupFilterRow"></div>
         <div style="position:relative;">
@@ -851,9 +870,14 @@ const FB_CONFIG = {
     <!-- ── Tab 4: 내 기록 ── -->
     <div class="tab-pane" id="tab-mine">
       <div class="mine-wrap">
-        <div class="mine-search-row">
+        <!-- 학생: 학번 검색 / 관리자: 전체 기록 -->
+        <div id="mineStudentRow" class="mine-search-row">
           <input class="inp" id="mineStudentId" type="text" inputmode="numeric" placeholder="학번 입력 (예: 10101)" style="flex:1;max-width:180px;">
           <button class="btn-pri" id="mineLookupBtn" style="padding:10px 18px;">조회</button>
+        </div>
+        <div id="mineAdminRow" style="display:none;padding:10px 16px 4px;display:none;align-items:center;justify-content:space-between;gap:8px;">
+          <span style="font-size:14px;font-weight:700;color:var(--pri);">🔓 전체 학생 기록</span>
+          <button id="lockAllMineBtn" onclick="lockAll()" style="font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;">🔒 전체 잠금</button>
         </div>
         <div id="mineCount" style="font-size:13px;color:var(--txt2);padding:0 16px 4px;"></div>
         <div class="obs-list" id="mineList"></div>
@@ -1669,7 +1693,8 @@ function resetForm() {
 }
 
 /* ──── Map Fullscreen Toggle ──── */
-const _fsState = { main: false, class: false };
+const _fsState  = { main: false, class: false };
+const _fsOrigin = {};   // 원래 DOM 위치 저장
 function toggleMapFs(which) {
   const containerId = which === 'main' ? 'mainMapContainer' : 'classMapContainer';
   const mapL        = which === 'main' ? mainMapL : classMapL;
@@ -1678,11 +1703,14 @@ function toggleMapFs(which) {
   const btn         = document.getElementById(btnId);
   _fsState[which]   = !_fsState[which];
 
-  // 제스처 오버레이 — 전체화면에서도 동작 유지
-  const overlay = el.querySelector('.map-gesture-overlay');
-
+  const overlay   = el.querySelector('.map-gesture-overlay');
   const isTouchDev = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
   if (_fsState[which]) {
+    // 원래 위치 저장 후 body 바로 밑으로 이동
+    // (overflow:auto 조상 안에서는 position:fixed가 뷰포트 기준으로 작동 안 함)
+    _fsOrigin[which] = { parent: el.parentNode, next: el.nextSibling };
+    document.body.appendChild(el);
     el.classList.add('map-fullscreen');
     btn.textContent = '✕';
     btn.title = '닫기';
@@ -1690,12 +1718,16 @@ function toggleMapFs(which) {
     if (overlay && isTouchDev) overlay.style.pointerEvents = 'auto';
   } else {
     el.classList.remove('map-fullscreen');
+    // 원래 위치로 복원
+    const { parent, next } = _fsOrigin[which] || {};
+    if (parent) next ? parent.insertBefore(el, next) : parent.appendChild(el);
+    delete _fsOrigin[which];
     btn.textContent = '⛶';
     btn.title = '전체화면';
     document.body.style.overflow = '';
     if (overlay && isTouchDev) overlay.style.pointerEvents = 'auto';
   }
-  // 크기 변경 후 Leaflet 재계산 (CSS 전환 완료 후)
+  // Leaflet 크기 재계산
   setTimeout(() => { if (mapL) mapL.invalidateSize(); }, 200);
   setTimeout(() => { if (mapL) mapL.invalidateSize(); }, 500);
 }
@@ -2074,7 +2106,7 @@ function openModal(id, obs) {
       ${isLocked ? '🔓 잠금 해제' : '🔒 잠그기 (학생 수정 불가)'}
     </button>` : '';
   document.getElementById('modalContent').innerHTML = `
-    ${obs.photo ? `<img class="modal-img" src="${obs.photo}" alt="${obs.species}">` : ''}
+    ${obs.photo ? `<img class="modal-img" src="${obs.photo}" alt="${obs.species}" onclick="openLightbox(this.src)">` : ''}
     <div class="modal-body">
       <div class="modal-species">${zone ? zone.em : '📍'} ${obs.species}</div>
       <div class="modal-row">
@@ -2102,12 +2134,23 @@ function switchTab(tabId) {
     setTimeout(() => { if (mainMapL) { mainMapL.invalidateSize(); renderMapPins(); } }, 150);
   }
   if (tabId === 'tab-mine') {
-    // 저장된 학번이 있으면 자동 조회
-    const info = loadStudentInfo();
-    if (info && info.sid) {
-      const mineInput = document.getElementById('mineStudentId');
-      if (mineInput && !mineInput.value) mineInput.value = info.sid;
-      lookupMine();
+    const studentRow = document.getElementById('mineStudentRow');
+    const adminRow   = document.getElementById('mineAdminRow');
+    if (adminMode) {
+      // 관리자: 전체 학생 기록 표시
+      if (studentRow) studentRow.style.display = 'none';
+      if (adminRow)   adminRow.style.display   = 'flex';
+      renderAllStudentRecords();
+    } else {
+      if (studentRow) studentRow.style.display = '';
+      if (adminRow)   adminRow.style.display   = 'none';
+      // 저장된 학번이 있으면 자동 조회
+      const info = loadStudentInfo();
+      if (info && info.sid) {
+        const mineInput = document.getElementById('mineStudentId');
+        if (mineInput && !mineInput.value) mineInput.value = info.sid;
+        lookupMine();
+      }
     }
   }
   if (tabId === 'tab-class') {
@@ -2190,6 +2233,26 @@ function resetFormMapToSchool() {
 }
 
 /* ──── Admin Mode ──── */
+function updateAdminUI() {
+  // 학급별 탭 전체 잠금 버튼
+  const lockClassBtn = document.getElementById('lockAllClassBtn');
+  if (lockClassBtn) lockClassBtn.style.display = adminMode ? '' : 'none';
+  // 현재 내 기록 탭이 열려있으면 새로고침
+  const minePane = document.getElementById('tab-mine');
+  if (minePane && minePane.classList.contains('active')) {
+    const studentRow = document.getElementById('mineStudentRow');
+    const adminRow   = document.getElementById('mineAdminRow');
+    if (adminMode) {
+      if (studentRow) studentRow.style.display = 'none';
+      if (adminRow)   adminRow.style.display   = 'flex';
+      renderAllStudentRecords();
+    } else {
+      if (studentRow) studentRow.style.display = '';
+      if (adminRow)   adminRow.style.display   = 'none';
+    }
+  }
+}
+
 function toggleAdminLogin() {
   if (adminMode) {
     adminMode = false;
@@ -2197,7 +2260,8 @@ function toggleAdminLogin() {
     document.getElementById('adminBtn').textContent = '🔒';
     document.getElementById('csvBtn').style.display = 'none';
     toast('🔒 관리자 모드 해제');
-    renderClassView(); // 삭제 버튼 숨김
+    renderClassView();
+    updateAdminUI();
   } else {
     document.getElementById('adminPwInput').value = '';
     document.getElementById('adminPwError').style.display = 'none';
@@ -2215,7 +2279,8 @@ function tryAdminLogin() {
     document.getElementById('adminBtn').textContent = '🔓';
     document.getElementById('csvBtn').style.display = '';
     toast('🔓 관리자 모드 활성화');
-    renderClassView(); // 삭제 버튼 표시
+    renderClassView();
+    updateAdminUI();
   } else {
     document.getElementById('adminPwError').style.display = 'block';
   }
@@ -2346,6 +2411,90 @@ function confirmDelete(id, species) {
 }
 
 /* ──── My Records ──── */
+/* ──── 전체 잠금 ──── */
+async function lockAll(scope) {
+  if (!adminMode) { toast('🔒 관리자만 잠금 설정할 수 있어요'); return; }
+  if (!obsRef) return;
+  let targets;
+  if (scope === 'class') {
+    const cls = document.getElementById('classViewSel').value;
+    targets = Object.entries(observations).filter(([, o]) =>
+      (cls === '__all__' || o.class === cls) && !o.locked
+    );
+  } else {
+    targets = Object.entries(observations).filter(([, o]) => !o.locked);
+  }
+  if (targets.length === 0) { toast('잠글 기록이 없어요'); return; }
+  const updates = {};
+  targets.forEach(([id]) => { updates[id + '/locked'] = true; });
+  try {
+    await obsRef.update(updates);
+    toast(`🔒 ${targets.length}개 기록이 잠겼어요`);
+  } catch(e) { toast('❌ 오류: ' + e.message); }
+}
+window.lockAll = lockAll;
+
+/* ──── 관리자 전체 학생 기록 ──── */
+function renderAllStudentRecords() {
+  const count = document.getElementById('mineCount');
+  const list  = document.getElementById('mineList');
+  const all   = Object.entries(observations).sort(([, a], [, b]) => {
+    const sa = (a.studentId || '').padStart(10, '0');
+    const sb = (b.studentId || '').padStart(10, '0');
+    return sa < sb ? -1 : sa > sb ? 1 : (b.timestamp - a.timestamp);
+  });
+
+  count.innerHTML = `<div style="padding:8px 0 4px;font-size:13px;color:var(--txt2);">총 ${all.length}건 / ${[...new Set(all.map(([,o])=>o.studentId).filter(Boolean))].length}명</div>`;
+  list.innerHTML = '';
+  if (all.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>기록이 없어요</p></div>`;
+    return;
+  }
+
+  let lastSid = null;
+  all.forEach(([id, obs]) => {
+    // 학번 구분선
+    if (obs.studentId !== lastSid) {
+      lastSid = obs.studentId;
+      const sep = document.createElement('div');
+      sep.style.cssText = 'padding:6px 4px 2px;font-size:12px;font-weight:700;color:var(--txt2);border-top:1px solid var(--bdr);margin-top:6px;';
+      sep.textContent = `${obs.studentId || '(학번없음)'} ${obs.name || ''}`;
+      list.appendChild(sep);
+    }
+
+    const zone     = ZONES.find(z => z.id === obs.location);
+    const grpColor = groupColor(obs.group);
+    const card     = document.createElement('div');
+    card.className = 'mine-card';
+    card.innerHTML = `
+      ${obs.photo
+        ? `<img class="mine-card-thumb" src="${obs.photo}" alt="${obs.species}">`
+        : `<div class="mine-card-thumb-placeholder">${zone ? zone.em : '📍'}</div>`}
+      <div class="mine-card-body">
+        <div class="mine-card-species">${obs.species}</div>
+        <div class="mine-card-tags">
+          <span class="mine-card-tag" style="background:${grpColor}20;border-color:${grpColor}40;color:${grpColor};">
+            <span class="grp-dot" style="background:${grpColor};width:7px;height:7px;"></span>${obs.class || ''} ${obs.group}
+          </span>
+          <span class="mine-card-tag">${obs.location}</span>
+          ${obs.locked ? `<span class="mine-card-tag" style="color:var(--pri);">🔒 잠김</span>` : ''}
+        </div>
+        ${obs.notes ? `<div class="mine-card-notes">${obs.notes}</div>` : ''}
+        <div class="mine-card-time">${formatTime(obs.timestamp)}</div>
+      </div>`;
+    // 관리자 편집/잠금 버튼
+    const actRow = document.createElement('div');
+    actRow.style.cssText = 'display:flex;gap:6px;padding:0 12px 10px;';
+    actRow.innerHTML = `
+      <button class="btn-edit" style="flex:1;" onclick="openEditModal('${id}')">✏️ 수정</button>
+      <button style="flex:1;padding:7px;border-radius:8px;font-size:12px;font-weight:700;border:1.5px solid ${obs.locked ? 'var(--pri)' : 'var(--bdr)'};background:var(--surf2);color:${obs.locked ? 'var(--pri)' : 'var(--txt2)'};cursor:pointer;" onclick="toggleLock('${id}',${!!obs.locked})">${obs.locked ? '🔓 해제' : '🔒 잠금'}</button>`;
+    card.appendChild(actRow);
+    card.querySelector('.mine-card-body').onclick = () => openModal(id, obs);
+    list.appendChild(card);
+  });
+}
+window.renderAllStudentRecords = renderAllStudentRecords;
+
 function lookupMine() {
   const sid = document.getElementById('mineStudentId').value.trim();
   if (!sid) { toast('학번을 입력하세요.'); return; }
@@ -2504,6 +2653,21 @@ window.clearPhoto = clearPhoto;
 window.openEditModal = openEditModal;
 window.resetFormMapToSchool = resetFormMapToSchool;
 window.confirmDelete = confirmDelete;
+
+/* ──── 라이트박스 ──── */
+(function() {
+  const lb = document.createElement('div');
+  lb.id = 'imgLightbox';
+  const img = document.createElement('img');
+  lb.appendChild(img);
+  document.body.appendChild(lb);
+  lb.addEventListener('click', () => lb.classList.remove('open'));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('open'); });
+  window.openLightbox = function(src) {
+    img.src = src;
+    lb.classList.add('open');
+  };
+})();
 </script>
 </body>
 </html>
