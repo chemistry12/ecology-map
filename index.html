@@ -966,6 +966,7 @@ const FB_CONFIG = {
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 
 <script>
 'use strict';
@@ -1202,10 +1203,13 @@ function bindStudentIdValidation() {
 }
 
 /* ──── Firebase ──── */
+let storageRef = null;
+
 function initFirebase() {
   try {
     firebase.initializeApp(FB_CONFIG);
-    obsRef = firebase.database().ref('observations');
+    obsRef      = firebase.database().ref('observations');
+    storageRef  = firebase.storage().ref('ecology-photos');
     obsRef.on('value', snap => {
       observations = snap.val() || {};
       onData();
@@ -1524,6 +1528,15 @@ function clearPhoto() {
 }
 
 /* ──── Image Compression ──── */
+function dataUrlToBlob(dataUrl) {
+  const [header, data] = dataUrl.split(',');
+  const mime   = header.match(/:(.*?);/)[1];
+  const binary = atob(data);
+  const arr    = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
 function compressImg(file, max, q) {
   return new Promise(res => {
     const img = new Image();
@@ -1634,6 +1647,21 @@ async function handleSubmit() {
   btn.textContent = '저장 중…';
 
   try {
+    // 사진 → Firebase Storage 업로드 후 URL 저장
+    let photoUrl = null;
+    if (photoData && storageRef) {
+      btn.textContent = '📤 사진 업로드 중…';
+      const blob     = dataUrlToBlob(photoData);
+      const filename = `${Date.now()}_${sid || 'unknown'}.jpg`;
+      const fileRef  = storageRef.child(filename);
+      await fileRef.put(blob, { contentType: 'image/jpeg' });
+      photoUrl = await fileRef.getDownloadURL();
+    } else if (photoData) {
+      // Storage 미초기화 시 fallback (기존 base64)
+      photoUrl = photoData;
+    }
+    btn.textContent = '저장 중…';
+
     const data = {
       class:     cls,
       group:     grp,
@@ -1643,7 +1671,7 @@ async function handleSubmit() {
       location:  selectedZone || '기타',
       lat:       pinLat !== null ? pinLat : (ZONES.find(z => z.id === selectedZone)?.lat ?? SCHOOL_CENTER[0]),
       lng:       pinLng !== null ? pinLng : (ZONES.find(z => z.id === selectedZone)?.lng ?? SCHOOL_CENTER[1]),
-      photo:     photoData || null,
+      photo:     photoUrl || null,
       notes:     notes,
       timestamp: Date.now(),
     };
@@ -2434,17 +2462,64 @@ async function lockAll(scope) {
 }
 window.lockAll = lockAll;
 
-/* ──── 관리자 전체 학생 기록 ──── */
+/* ──── 내 기록 공용 카드 생성 (obs-card 스타일) ──── */
+function makeMineObsCard(id, obs, isAdmin) {
+  const zone = ZONES.find(z => z.id === obs.location);
+  const card = document.createElement('div');
+  card.className = 'obs-card';
+  const metaLine = isAdmin
+    ? `${obs.class || ''} · ${obs.group} · ${obs.studentId ? obs.studentId + ' ' : ''}${obs.name || ''} · ${obs.location}`
+    : `${obs.group} · ${obs.location}`;
+  card.innerHTML = `
+    ${obs.photo
+      ? `<img class="obs-card-img" src="${obs.photo}" alt="${obs.species}">`
+      : `<div class="obs-card-img-placeholder">${zone ? zone.em : '📍'}</div>`}
+    <div class="obs-card-body">
+      <div class="obs-card-species">${obs.species}</div>
+      <div class="obs-card-meta">${metaLine}</div>
+      ${obs.notes ? `<div class="obs-card-notes">${obs.notes}</div>` : ''}
+      <div class="obs-card-time">${formatTime(obs.timestamp)}</div>
+    </div>`;
+  if (isAdmin) {
+    // 관리자: 잠금 토글 + 수정 버튼
+    const btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex-shrink:0;';
+    btns.innerHTML = `
+      <button class="obs-card-del" onclick="openEditModal('${id}')" title="수정" style="color:var(--pri);">✏️</button>
+      <button style="background:transparent;font-size:15px;padding:4px;color:${obs.locked ? 'var(--pri)' : 'var(--txt2)'};" onclick="toggleLock('${id}',${!!obs.locked})" title="${obs.locked ? '잠금 해제' : '잠그기'}">${obs.locked ? '🔒' : '🔓'}</button>`;
+    card.appendChild(btns);
+  } else {
+    // 학생: 잠금 아이콘 or 수정 버튼
+    if (obs.locked) {
+      const lk = document.createElement('span');
+      lk.style.cssText = 'font-size:15px;color:var(--txt2);padding:4px;flex-shrink:0;';
+      lk.title = '잠긴 기록';
+      lk.textContent = '🔒';
+      card.appendChild(lk);
+    } else {
+      const eb = document.createElement('button');
+      eb.style.cssText = 'flex-shrink:0;font-size:13px;font-weight:700;padding:5px 10px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--surf2);color:var(--txt2);cursor:pointer;';
+      eb.textContent = '✏️';
+      eb.onclick = (e) => { e.stopPropagation(); openEditModal(id); };
+      card.appendChild(eb);
+    }
+  }
+  card.querySelector('.obs-card-body').onclick = () => openModal(id, obs);
+  return card;
+}
+
+/* ──── 관리자 전체 학생 기록 (학번순) ──── */
 function renderAllStudentRecords() {
   const count = document.getElementById('mineCount');
   const list  = document.getElementById('mineList');
   const all   = Object.entries(observations).sort(([, a], [, b]) => {
-    const sa = (a.studentId || '').padStart(10, '0');
-    const sb = (b.studentId || '').padStart(10, '0');
+    const sa = (a.studentId || '￿').padStart(10, '0');
+    const sb = (b.studentId || '￿').padStart(10, '0');
     return sa < sb ? -1 : sa > sb ? 1 : (b.timestamp - a.timestamp);
   });
 
-  count.innerHTML = `<div style="padding:8px 0 4px;font-size:13px;color:var(--txt2);">총 ${all.length}건 / ${[...new Set(all.map(([,o])=>o.studentId).filter(Boolean))].length}명</div>`;
+  const studentCount = [...new Set(all.map(([,o]) => o.studentId).filter(Boolean))].length;
+  count.innerHTML = `<div style="padding:6px 0 4px;font-size:13px;color:var(--txt2);">총 ${all.length}건 / ${studentCount}명</div>`;
   list.innerHTML = '';
   if (all.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>기록이 없어요</p></div>`;
@@ -2453,54 +2528,25 @@ function renderAllStudentRecords() {
 
   let lastSid = null;
   all.forEach(([id, obs]) => {
-    // 학번 구분선
     if (obs.studentId !== lastSid) {
       lastSid = obs.studentId;
       const sep = document.createElement('div');
-      sep.style.cssText = 'padding:6px 4px 2px;font-size:12px;font-weight:700;color:var(--txt2);border-top:1px solid var(--bdr);margin-top:6px;';
-      sep.textContent = `${obs.studentId || '(학번없음)'} ${obs.name || ''}`;
+      sep.style.cssText = 'padding:8px 4px 2px;font-size:12px;font-weight:700;color:var(--txt2);border-top:1px solid var(--bdr);margin-top:4px;';
+      sep.textContent = `${obs.studentId || '(학번 없음)'}  ${obs.name || ''}`;
       list.appendChild(sep);
     }
-
-    const zone     = ZONES.find(z => z.id === obs.location);
-    const grpColor = groupColor(obs.group);
-    const card     = document.createElement('div');
-    card.className = 'mine-card';
-    card.innerHTML = `
-      ${obs.photo
-        ? `<img class="mine-card-thumb" src="${obs.photo}" alt="${obs.species}">`
-        : `<div class="mine-card-thumb-placeholder">${zone ? zone.em : '📍'}</div>`}
-      <div class="mine-card-body">
-        <div class="mine-card-species">${obs.species}</div>
-        <div class="mine-card-tags">
-          <span class="mine-card-tag" style="background:${grpColor}20;border-color:${grpColor}40;color:${grpColor};">
-            <span class="grp-dot" style="background:${grpColor};width:7px;height:7px;"></span>${obs.class || ''} ${obs.group}
-          </span>
-          <span class="mine-card-tag">${obs.location}</span>
-          ${obs.locked ? `<span class="mine-card-tag" style="color:var(--pri);">🔒 잠김</span>` : ''}
-        </div>
-        ${obs.notes ? `<div class="mine-card-notes">${obs.notes}</div>` : ''}
-        <div class="mine-card-time">${formatTime(obs.timestamp)}</div>
-      </div>`;
-    // 관리자 편집/잠금 버튼
-    const actRow = document.createElement('div');
-    actRow.style.cssText = 'display:flex;gap:6px;padding:0 12px 10px;';
-    actRow.innerHTML = `
-      <button class="btn-edit" style="flex:1;" onclick="openEditModal('${id}')">✏️ 수정</button>
-      <button style="flex:1;padding:7px;border-radius:8px;font-size:12px;font-weight:700;border:1.5px solid ${obs.locked ? 'var(--pri)' : 'var(--bdr)'};background:var(--surf2);color:${obs.locked ? 'var(--pri)' : 'var(--txt2)'};cursor:pointer;" onclick="toggleLock('${id}',${!!obs.locked})">${obs.locked ? '🔓 해제' : '🔒 잠금'}</button>`;
-    card.appendChild(actRow);
-    card.querySelector('.mine-card-body').onclick = () => openModal(id, obs);
-    list.appendChild(card);
+    list.appendChild(makeMineObsCard(id, obs, true));
   });
 }
 window.renderAllStudentRecords = renderAllStudentRecords;
 
+/* ──── 학생 내 기록 조회 ──── */
 function lookupMine() {
-  const sid = document.getElementById('mineStudentId').value.trim();
+  const sid   = document.getElementById('mineStudentId').value.trim();
   if (!sid) { toast('학번을 입력하세요.'); return; }
   const myObs = Object.entries(observations).filter(([, o]) => o.studentId === sid);
   const count = document.getElementById('mineCount');
-  const list = document.getElementById('mineList');
+  const list  = document.getElementById('mineList');
 
   if (myObs.length === 0) {
     count.textContent = '';
@@ -2508,13 +2554,12 @@ function lookupMine() {
     return;
   }
 
-  // 통계 헤더
-  const species = [...new Set(myObs.map(([,o]) => o.species))];
-  const firstObs = myObs[0][1];
-  count.innerHTML = `
+  const speciesSet = [...new Set(myObs.map(([,o]) => o.species))];
+  const first      = myObs[0][1];
+  count.innerHTML  = `
     <div style="background:var(--surf);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow);">
       <div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:6px;">
-        ${firstObs.class} · ${firstObs.group} · ${firstObs.name || sid}
+        ${first.class || ''} · ${first.group} · ${first.name || sid}
       </div>
       <div style="display:flex;gap:16px;">
         <div style="text-align:center;">
@@ -2522,55 +2567,15 @@ function lookupMine() {
           <div style="font-size:11px;color:var(--txt2);">총 기록</div>
         </div>
         <div style="text-align:center;">
-          <div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--pri);">${species.length}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--pri);">${speciesSet.length}</div>
           <div style="font-size:11px;color:var(--txt2);">종 수</div>
         </div>
       </div>
     </div>`;
 
-  // 카드 그리드
   list.innerHTML = '';
-  const grid = document.createElement('div');
-  grid.className = 'mine-grid';
-
-  myObs.sort(([,a],[,b]) => b.timestamp - a.timestamp).forEach(([id, obs]) => {
-    const zone = ZONES.find(z => z.id === obs.location);
-    const grpColor = groupColor(obs.group);
-    const card = document.createElement('div');
-    card.className = 'mine-card';
-    card.innerHTML = `
-      ${obs.photo
-        ? `<img class="mine-card-thumb" src="${obs.photo}" alt="${obs.species}">`
-        : `<div class="mine-card-thumb-placeholder">${zone ? zone.em : '📍'}</div>`}
-      <div class="mine-card-body">
-        <div class="mine-card-species">${obs.species}</div>
-        <div class="mine-card-tags">
-          <span class="mine-card-tag" style="background:${grpColor}20;border-color:${grpColor}40;color:${grpColor};">
-            <span class="grp-dot" style="background:${grpColor};width:7px;height:7px;"></span>${obs.group}
-          </span>
-          <span class="mine-card-tag">${obs.location}</span>
-        </div>
-        ${obs.notes ? `<div class="mine-card-notes">${obs.notes}</div>` : ''}
-        <div class="mine-card-time">${formatTime(obs.timestamp)}</div>
-      </div>`;
-    // 수정 버튼 — 잠긴 기록은 숨김
-    if (obs.locked) {
-      const lockBadge = document.createElement('div');
-      lockBadge.style.cssText = 'padding:5px 14px 10px;font-size:12px;color:var(--txt2);text-align:center;';
-      lockBadge.textContent = '🔒 잠긴 기록';
-      card.appendChild(lockBadge);
-    } else {
-      const editBtn = document.createElement('button');
-      editBtn.className = 'mine-card-edit-btn';
-      editBtn.textContent = '✏️ 수정';
-      editBtn.onclick = (e) => { e.stopPropagation(); openEditModal(id); };
-      card.appendChild(editBtn);
-    }
-
-    card.querySelector('.mine-card-body').onclick = () => openModal(id, obs);
-    grid.appendChild(card);
-  });
-  list.appendChild(grid);
+  myObs.sort(([,a],[,b]) => b.timestamp - a.timestamp)
+       .forEach(([id, obs]) => list.appendChild(makeMineObsCard(id, obs, false)));
 }
 
 /* ──── Event Bindings ──── */
