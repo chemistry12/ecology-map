@@ -1682,6 +1682,10 @@ async function handleSubmit() {
   if (!name) { showErr('⚠️ 이름을 입력하세요'); return; }
   const sidErr = validateStudentId(cls, sid);
   if (sidErr) { showErr(sidErr); return; }
+  // 명단 검사 (테스트반 제외)
+  if (STUDENT_ROSTER && cls !== '테스트반' && cls !== '1학년 12반(테스트)') {
+    if (!STUDENT_ROSTER[sid]) { showErr('⚠️ 명단에 없는 학번이에요. 다시 확인해주세요'); return; }
+  }
   if (!sp)   { showErr('⚠️ 생물 이름을 입력하세요'); return; }
   if (!selectedZone && pinLat === null) { showErr('⚠️ 발견 위치를 선택하거나 지도에 핀을 찍으세요'); return; }
 
