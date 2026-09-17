@@ -880,8 +880,9 @@ const FB_CONFIG = {
         </div>
         <div class="group-filter-row" id="groupFilterRow"></div>
         <div style="position:relative;">
-          <div class="class-map-container" id="classMapContainer" style="height:260px;"></div>
-          <button class="map-fs-btn" id="classFsBtn" title="전체화면" onclick="toggleMapFs('class')">⛶</button>
+          <div class="class-map-container" id="classMapContainer" style="height:260px;">
+            <button class="map-fs-btn" id="classFsBtn" title="전체화면" onclick="toggleMapFs('class')">⛶</button>
+          </div>
         </div>
         <div class="stats-bar" id="statsBar"></div>
         <div class="obs-list" id="obsList"></div>
@@ -2082,7 +2083,7 @@ function renderProgressBoard(isAll) {
   // 반별로 어떤 조가 기록했는지 집계
   const CLASSES = [];
   for (let c = 1; c <= 11; c++) CLASSES.push(`1학년 ${c}반`);
-  CLASSES.push('테스트반');
+  if (adminMode) CLASSES.push('테스트반'); // 관리자 모드에서만 표시
 
   const ALL_GROUPS = ['1조','2조','3조','4조','5조','6조'];
 
