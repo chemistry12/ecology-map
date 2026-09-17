@@ -966,7 +966,6 @@ const FB_CONFIG = {
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 
 <script>
 'use strict';
@@ -1203,13 +1202,11 @@ function bindStudentIdValidation() {
 }
 
 /* ──── Firebase ──── */
-let storageRef = null;
 
 function initFirebase() {
   try {
     firebase.initializeApp(FB_CONFIG);
     obsRef      = firebase.database().ref('observations');
-    storageRef  = firebase.storage().ref('ecology-photos');
     obsRef.on('value', snap => {
       observations = snap.val() || {};
       onData();
@@ -1499,7 +1496,7 @@ document.addEventListener('DOMContentLoaded', () => {
       autoSelectZone(gps.lat, gps.lon);
       toast('📍 사진 GPS 위치로 핀 설정됨');
     }
-    photoData = await compressImg(file, 600, 0.78);
+    photoData = await compressImg(file, 300, 0.5);
     renderPhotoArea();
   });
 });
@@ -1647,19 +1644,8 @@ async function handleSubmit() {
   btn.textContent = '저장 중…';
 
   try {
-    // 사진 → Firebase Storage 업로드 후 URL 저장
-    let photoUrl = null;
-    if (photoData && storageRef) {
-      btn.textContent = '📤 사진 업로드 중…';
-      const blob     = dataUrlToBlob(photoData);
-      const filename = `${Date.now()}_${sid || 'unknown'}.jpg`;
-      const fileRef  = storageRef.child(filename);
-      await fileRef.put(blob, { contentType: 'image/jpeg' });
-      photoUrl = await fileRef.getDownloadURL();
-    } else if (photoData) {
-      // Storage 미초기화 시 fallback (기존 base64)
-      photoUrl = photoData;
-    }
+    // 사진 → base64로 RTDB에 저장
+    let photoUrl = photoData || null;
     btn.textContent = '저장 중…';
 
     const data = {
