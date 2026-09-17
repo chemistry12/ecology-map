@@ -877,6 +877,7 @@ const FB_CONFIG = {
           <label>학급 선택:</label>
           <select class="inp" id="classViewSel" style="max-width:180px;"></select>
           <button id="lockAllClassBtn" onclick="lockAll('class')" style="display:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;">🔒 전체 잠금</button>
+          <button id="unlockAllClassBtn" onclick="unlockAll('class')" style="display:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;">🔓 전체 해제</button>
         </div>
         <div class="group-filter-row" id="groupFilterRow"></div>
         <div style="position:relative;">
@@ -1863,7 +1864,9 @@ function renderMapPins() {
 
 
 function renderClassFilterChips() {
-  const classesPresent = [...new Set(Object.values(observations).map(o => o.class))].sort();
+  const classesPresent = [...new Set(Object.values(observations).map(o => o.class))]
+    .filter(c => adminMode || c !== '테스트반')
+    .sort();
   const wrap = document.getElementById('classFilterChips');
   if (!wrap) return;
   wrap.innerHTML = '';
@@ -2361,9 +2364,11 @@ function updateAdminUI() {
     }
   });
 
-  // 학급별 탭 전체 잠금 버튼
-  const lockClassBtn = document.getElementById('lockAllClassBtn');
-  if (lockClassBtn) lockClassBtn.style.display = adminMode ? '' : 'none';
+  // 학급별 탭 전체 잠금 / 전체 해제 버튼
+  const lockClassBtn   = document.getElementById('lockAllClassBtn');
+  const unlockClassBtn = document.getElementById('unlockAllClassBtn');
+  if (lockClassBtn)   lockClassBtn.style.display   = adminMode ? '' : 'none';
+  if (unlockClassBtn) unlockClassBtn.style.display = adminMode ? '' : 'none';
   // 현재 내 기록 탭이 열려있으면 새로고침
   const minePane = document.getElementById('tab-mine');
   if (minePane && minePane.classList.contains('active')) {
@@ -2560,6 +2565,29 @@ async function lockAll(scope) {
   } catch(e) { toast('❌ 오류: ' + e.message); }
 }
 window.lockAll = lockAll;
+
+/* ──── 전체 잠금 해제 ──── */
+async function unlockAll(scope) {
+  if (!adminMode) { toast('🔒 관리자만 잠금 해제할 수 있어요'); return; }
+  if (!obsRef) return;
+  let targets;
+  if (scope === 'class') {
+    const cls = document.getElementById('classViewSel').value;
+    targets = Object.entries(observations).filter(([, o]) =>
+      (cls === '__all__' || o.class === cls) && o.locked
+    );
+  } else {
+    targets = Object.entries(observations).filter(([, o]) => o.locked);
+  }
+  if (targets.length === 0) { toast('해제할 기록이 없어요'); return; }
+  const updates = {};
+  targets.forEach(([id]) => { updates[id + '/locked'] = false; });
+  try {
+    await obsRef.update(updates);
+    toast(`🔓 ${targets.length}개 기록 잠금이 해제됐어요`);
+  } catch(e) { toast('❌ 오류: ' + e.message); }
+}
+window.unlockAll = unlockAll;
 
 /* ──── 내 기록 공용 카드 생성 (obs-card 스타일) ──── */
 function makeMineObsCard(id, obs, isAdmin) {
