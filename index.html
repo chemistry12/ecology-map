@@ -1220,6 +1220,21 @@ function bindStudentIdValidation() {
   }
   inpSid.addEventListener('input', checkSid);
   selClass.addEventListener('change', checkSid);
+
+  // 이름 칸 — 명단 학번이면 입력 차단
+  const inpNameEl = document.getElementById('inpName');
+  if (inpNameEl) {
+    inpNameEl.addEventListener('beforeinput', (e) => {
+      const sid = inpSid.value.trim();
+      if (STUDENT_ROSTER && STUDENT_ROSTER[sid]) e.preventDefault();
+    });
+    inpNameEl.addEventListener('input', () => {
+      const sid = inpSid.value.trim();
+      if (STUDENT_ROSTER && STUDENT_ROSTER[sid]) {
+        inpNameEl.value = STUDENT_ROSTER[sid];
+      }
+    });
+  }
 }
 
 /* ──── Google Apps Script API ──── */
