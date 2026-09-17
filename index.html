@@ -2204,8 +2204,8 @@ function _renderModalContent(id, obs) {
   const counter    = document.getElementById('modalNavCounter');
   if (_modalList.length > 1) {
     navRow.style.display = '';
-    prevBtn.disabled = _modalIdx <= 0;
-    nextBtn.disabled = _modalIdx >= _modalList.length - 1;
+    prevBtn.disabled = false;
+    nextBtn.disabled = false;
     counter.textContent = `${_modalIdx + 1} / ${_modalList.length}`;
   } else {
     navRow.style.display = 'none';
@@ -2213,8 +2213,10 @@ function _renderModalContent(id, obs) {
 }
 
 function modalNav(dir) {
-  const next = _modalIdx + dir;
-  if (next < 0 || next >= _modalList.length) return;
+  if (_modalList.length <= 1) return;
+  let next = _modalIdx + dir;
+  if (next < 0) next = _modalList.length - 1;
+  if (next >= _modalList.length) next = 0;
   _modalIdx = next;
   const { id, obs } = _modalList[_modalIdx];
   // 슬라이드 애니메이션
