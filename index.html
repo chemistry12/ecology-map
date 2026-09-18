@@ -1035,6 +1035,14 @@ let currentClassView = '';
 let themeMode = localStorage.getItem('theme') || 'auto';
 let adminMode = false;
 const ADMIN_PW = '1990';
+const TEST_CLASSES = ['테스트반', '1학년 12반(테스트)'];
+
+// 비관리자에게 숨길 관측 필터
+function visibleEntries() {
+  return Object.entries(observations).filter(([, o]) =>
+    adminMode || !TEST_CLASSES.includes(o.class)
+  );
+}
 let editingId = null;
 let currentGroupFilter = 'all';
 
@@ -1215,6 +1223,7 @@ async function gasAPI(action, params = {}) {
   }
   const res = await fetch(GAS_URL, {
     method: 'POST',
+    redirect: 'follow',
     body: JSON.stringify({ action, ...params }),
   });
   const json = await res.json();
@@ -1840,7 +1849,7 @@ function renderMapPins() {
   obsMarkersMain = [];
 
   // 생태지도 탭용 목록 (위치 있는 것만, 타임스탬프 내림차순)
-  const mapList = Object.entries(observations)
+  const mapList = visibleEntries()
     .filter(([, o]) => {
       if (activeFilter !== 'all' && o.class !== activeFilter) return false;
       const lat = o.lat || (o.mapY != null && (37.3051 - o.mapY * 0.0014));
@@ -1850,7 +1859,7 @@ function renderMapPins() {
     .sort(([, a], [, b]) => b.timestamp - a.timestamp)
     .map(([id, obs]) => ({ id, obs }));
 
-  Object.entries(observations).forEach(([id, obs]) => {
+  visibleEntries().forEach(([id, obs]) => {
     if (activeFilter !== 'all' && obs.class !== activeFilter) return;
     const lat = obs.lat || (obs.mapY != null && (37.3051 - obs.mapY * 0.0014));
     const lng = obs.lng || (obs.mapX != null && (126.9736 + obs.mapX * 0.0024));
@@ -1928,8 +1937,8 @@ function renderClassView() {
 
   // 기반 관측 (조 필터 전 — 조 버튼 빌드에 사용)
   const baseObs = isAll
-    ? Object.entries(observations)
-    : Object.entries(observations).filter(([, o]) => o.class === cls);
+    ? visibleEntries()
+    : visibleEntries().filter(([, o]) => o.class === cls);
 
   // 조 필터 적용
   const clsObs = currentGroupFilter === 'all'
@@ -2109,7 +2118,7 @@ function renderProgressBoard(isAll) {
   const ALL_GROUPS = ['1조','2조','3조','4조','5조','6조'];
 
   const recorded = {}; // { '1학년 1반': Set(['1조','2조',...]) }
-  Object.values(observations).forEach(o => {
+  visibleEntries().forEach(([, o]) => {
     if (!o.class || !o.group) return;
     if (!recorded[o.class]) recorded[o.class] = new Set();
     recorded[o.class].add(o.group);
@@ -2118,7 +2127,7 @@ function renderProgressBoard(isAll) {
   const presentClasses = CLASSES.filter(c => recorded[c]);
   if (!presentClasses.length) { board.style.display = 'none'; return; }
 
-  const totalObs = Object.values(observations).length;
+  const totalObs = visibleEntries().length;
   const classCount = presentClasses.length;
 
   board.style.display = 'block';
@@ -2130,7 +2139,7 @@ function renderProgressBoard(isAll) {
     </div>
     ${presentClasses.map(cls => {
       const doneGroups = recorded[cls] || new Set();
-      const clsObs = Object.values(observations).filter(o => o.class === cls);
+      const clsObs = visibleEntries().filter(([, o]) => o.class === cls).map(([, o]) => o);
       const color = classColor(cls);
       return `<div class="progress-class-row">
         <div class="progress-cls-name" style="color:${color};">${cls.replace('1학년 ','')}</div>
@@ -2732,7 +2741,7 @@ window.renderAllStudentRecords = renderAllStudentRecords;
 function lookupMine() {
   const sid   = document.getElementById('mineStudentId').value.trim();
   if (!sid) { toast('학번을 입력하세요.'); return; }
-  const myObs = Object.entries(observations).filter(([, o]) => String(o.studentId) === sid);
+  const myObs = visibleEntries().filter(([, o]) => String(o.studentId) === sid);
   const count = document.getElementById('mineCount');
   const list  = document.getElementById('mineList');
 
