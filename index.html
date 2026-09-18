@@ -324,12 +324,23 @@ textarea.inp { height: 80px; resize: none; }
   opacity: 0; transition: opacity .25s; white-space: nowrap; z-index: 601;
 }
 
-/* 전체화면 모드 */
+/* 전체화면 모드 — body 클래스 방식 (미디어쿼리 !important보다 특이도 높음) */
+body.map-fs-active .topbar,
+body.map-fs-active .bottom-nav { display: none !important; }
+body.map-fs-active #classMapContainer,
+body.map-fs-active #mainMapContainer {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important;
+  width: 100vw !important; height: 100vh !important;
+  z-index: 9000 !important; border-radius: 0 !important;
+  margin: 0 !important; max-height: none !important;
+  min-height: unset !important;
+}
 .map-fullscreen {
   position: fixed !important;
   top: 0 !important; left: 0 !important;
   right: 0 !important; bottom: 0 !important;
-  z-index: 8000 !important; border-radius: 0 !important;
+  z-index: 9000 !important; border-radius: 0 !important;
   height: 100vh !important; width: 100vw !important;
   max-height: none !important; min-height: unset !important;
   margin: 0 !important;
@@ -1785,22 +1796,25 @@ function toggleMapFs(which) {
   const isTouchDev = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
   if (_fsState[which]) {
-    // 원래 위치 저장 후 body 바로 밑으로 이동
+    // 원래 위치 저장
     _fsOrigin[which] = { parent: el.parentNode, next: el.nextSibling };
-    document.body.appendChild(el);
-    // 인라인 스타일로 강제 (ID 선택자 !important 규칙 우선순위 무시)
-    Object.assign(el.style, {
-      position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
-      width: '100vw', height: '100vh', zIndex: '8000',
-      borderRadius: '0', margin: '0'
-    });
+    // body 클래스 추가 (CSS로 topbar/bottom-nav 숨김 + 지도 컨테이너 확장)
+    document.body.classList.add('map-fs-active');
+    // 추가 보강: setProperty('important')로 미디어쿼리 !important 규칙도 덮어씀
+    const fsProps = { position:'fixed', top:'0', left:'0', right:'0', bottom:'0',
+                      width:'100vw', height:'100vh', 'z-index':'9000',
+                      'border-radius':'0', margin:'0', 'max-height':'none' };
+    Object.entries(fsProps).forEach(([p, v]) => el.style.setProperty(p, v, 'important'));
     btn.textContent = '✕';
     btn.title = '닫기';
     document.body.style.overflow = 'hidden';
     if (overlay && isTouchDev) overlay.style.pointerEvents = 'auto';
   } else {
-    // 인라인 스타일 초기화
-    ['position','top','left','right','bottom','width','height','zIndex','borderRadius','margin'].forEach(p => el.style[p] = '');
+    // body 클래스 제거
+    document.body.classList.remove('map-fs-active');
+    // 인라인 스타일 완전 초기화
+    ['position','top','left','right','bottom','width','height','z-index','border-radius','margin','max-height']
+      .forEach(p => el.style.removeProperty(p));
     // 원래 위치로 복원
     const { parent, next } = _fsOrigin[which] || {};
     if (parent) next ? parent.insertBefore(el, next) : parent.appendChild(el);
@@ -1810,9 +1824,9 @@ function toggleMapFs(which) {
     document.body.style.overflow = '';
     if (overlay && isTouchDev) overlay.style.pointerEvents = 'auto';
   }
-  // Leaflet 크기 재계산
-  const maps = [mapL, classMapL].filter(Boolean);
-  [100, 300, 600].forEach(t => setTimeout(() => maps.forEach(m => m.invalidateSize()), t));
+  // Leaflet 크기 재계산 (레이아웃 안정화 후 순차 실행)
+  const maps = [mapL].filter(Boolean);
+  [50, 200, 500].forEach(t => setTimeout(() => maps.forEach(m => m.invalidateSize()), t));
 }
 // ESC 키로 전체화면 닫기
 document.addEventListener('keydown', e => {
