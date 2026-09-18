@@ -877,13 +877,13 @@ body.map-fs-active #mainMapContainer {
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:6px;">
             <label style="margin-bottom:0;flex-shrink:0;">사진</label>
             <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-              <button id="inatBtn" onclick="inatIdentify()" type="button"
-                style="font-size:12px;font-weight:600;color:#fff;background:linear-gradient(135deg,#74ac00,#5a8a00);padding:4px 10px;border-radius:99px;white-space:nowrap;border:none;opacity:.5;cursor:not-allowed;transition:opacity .2s;">
-                🌿 AI 동정
-              </button>
               <a href="https://lens.google.com/" target="_blank" rel="noopener"
                  style="font-size:12px;font-weight:600;color:var(--pri);text-decoration:none;padding:4px 10px;border:1.5px solid var(--pri);border-radius:99px;white-space:nowrap;">
                 🔍 구글 렌즈
+              </a>
+              <a href="https://moyamo.co.kr/" target="_blank" rel="noopener"
+                 style="font-size:12px;font-weight:600;color:#5B8C3E;text-decoration:none;padding:4px 10px;border:1.5px solid #5B8C3E;border-radius:99px;white-space:nowrap;">
+                🌱 모야모
               </a>
             </div>
           </div>
@@ -1678,12 +1678,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     photoData = await compressImg(file, 1200, 0.85);
     renderPhotoArea();
-    // iNat 버튼 활성화
-    const inatBtn = document.getElementById('inatBtn');
-    if (inatBtn) {
-      inatBtn.style.opacity = '1';
-      inatBtn.style.cursor = 'pointer';
-    }
   });
 });
 
@@ -1708,88 +1702,6 @@ function clearPhoto() {
   photoData = null;
   document.getElementById('photoInput').value = '';
   renderPhotoArea();
-  // iNat 버튼 비활성화
-  const inatBtn = document.getElementById('inatBtn');
-  if (inatBtn) { inatBtn.style.opacity = '.5'; inatBtn.style.cursor = 'not-allowed'; }
-}
-
-/* ──── iNaturalist AI 동정 ──── */
-async function inatIdentify() {
-  if (!photoData) return;
-  const btn = document.getElementById('inatBtn');
-  if (btn && btn.style.cursor === 'not-allowed') return;
-
-  // base64 → Blob
-  const [meta, b64] = photoData.split(',');
-  const mime = meta.match(/:(.*?);/)[1];
-  const bytes = atob(b64);
-  const arr = new Uint8Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-  const blob = new Blob([arr], { type: mime });
-
-  if (btn) { btn.textContent = '⏳ 분석 중...'; btn.style.opacity = '.7'; }
-
-  try {
-    const fd = new FormData();
-    fd.append('image', blob, 'photo.jpg');
-
-    const res = await fetch('https://api.inaturalist.org/v1/computervision/score_image?locale=ko', {
-      method: 'POST',
-      body: fd
-    });
-    if (!res.ok) throw new Error('API 오류 ' + res.status);
-    const json = await res.json();
-    const results = (json.results || []).slice(0, 5);
-    if (!results.length) { toast('인식된 생물이 없습니다'); return; }
-
-    showInatResults(results);
-  } catch(e) {
-    toast('❌ AI 동정 실패: ' + e.message);
-  } finally {
-    if (btn) { btn.textContent = '🌿 AI 동정'; btn.style.opacity = '1'; }
-  }
-}
-
-function showInatResults(results) {
-  // 기존 팝업 제거
-  document.getElementById('inatPopup')?.remove();
-
-  const items = results.map(r => {
-    const ko  = r.taxon?.preferred_common_name || '';
-    const sci = r.taxon?.name || '';
-    const pct = Math.round((r.combined_score || 0) * 100);
-    const label = ko ? `${ko} <span style="color:var(--txt2);font-size:11px;font-style:italic;">${sci}</span>` : `<span style="font-style:italic;">${sci}</span>`;
-    return `<button onclick="applyInatSpecies('${(ko||sci).replace(/'/g,"\\'")}');document.getElementById('inatPopup').remove();"
-      style="width:100%;text-align:left;padding:10px 14px;border-radius:12px;background:var(--surf2);border:1px solid var(--bdr);font-size:13px;font-weight:600;color:var(--txt);display:flex;justify-content:space-between;align-items:center;gap:8px;">
-      <span>${label}</span>
-      <span style="font-size:11px;color:var(--pri);font-weight:700;white-space:nowrap;">${pct}%</span>
-    </button>`;
-  }).join('');
-
-  const popup = document.createElement('div');
-  popup.id = 'inatPopup';
-  popup.style.cssText = `
-    position:fixed;inset:0;z-index:10000;display:flex;align-items:flex-end;justify-content:center;
-    background:rgba(0,0,0,.45);
-  `;
-  popup.innerHTML = `
-    <div style="background:var(--surf);border-radius:24px 24px 0 0;width:100%;max-width:520px;padding:20px 16px 32px;box-shadow:0 -8px 40px rgba(0,0,0,.2);">
-      <div style="width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 16px;"></div>
-      <div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:12px;">🌿 AI 동정 결과</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">${items}</div>
-      <button onclick="document.getElementById('inatPopup').remove()"
-        style="margin-top:14px;width:100%;padding:12px;border-radius:14px;background:var(--surf2);color:var(--txt2);font-size:13px;font-weight:600;border:1px solid var(--bdr);">
-        취소
-      </button>
-    </div>`;
-  popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
-  document.body.appendChild(popup);
-}
-
-function applyInatSpecies(name) {
-  const el = document.getElementById('inpSpecies');
-  if (el) { el.value = name; el.dispatchEvent(new Event('input')); }
-  toast('✅ 종명 입력됨: ' + name);
 }
 
 /* ──── Image Compression ──── */
