@@ -760,6 +760,14 @@ body.map-fs-active #mainMapContainer {
   min-width: 36px; text-align: right;
 }
 
+/* ───── 수정 모달 필드 ───── */
+.edit-field-wrap { display: flex; flex-direction: column; gap: 4px; }
+.edit-field-label {
+  font-size: 11px; font-weight: 700; color: var(--txt2);
+  letter-spacing: .03em; padding-left: 2px;
+}
+.edit-field-inp { margin-bottom: 0 !important; }
+
 /* ───── 내 기록 수정 버튼 ───── */
 .mine-card-edit-btn {
   display: block; width: calc(100% - 28px); margin: 0 14px 12px;
@@ -1040,23 +1048,58 @@ body.map-fs-active #mainMapContainer {
 
 <!-- Edit Modal -->
 <div class="modal-bg" id="editModalBg">
-  <div class="modal" id="editModal" style="max-width:420px;">
-    <h3 style="margin-bottom:16px;color:var(--pri);">✏️ 기록 수정</h3>
-    <!-- 관리자 전용 필드 -->
-    <div id="editAdminFields" style="display:none;margin-bottom:10px;padding:10px 12px;background:var(--surf2);border-radius:var(--r);border:1px solid var(--bdr);">
-      <div style="font-size:11px;font-weight:700;color:var(--acc);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">🔓 관리자 전용</div>
-      <select class="inp" id="editClassSel" style="margin-bottom:8px;"></select>
-      <div class="row2">
-        <input class="inp" id="editStudentId" type="text" placeholder="학번" inputmode="numeric">
-        <input class="inp" id="editNameInp" type="text" placeholder="이름">
+  <div class="modal" id="editModal" style="max-width:440px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+      <span style="font-size:22px;">✏️</span>
+      <span style="font-size:17px;font-weight:800;color:var(--txt);">기록 수정</span>
+    </div>
+
+    <!-- 반/모둠 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div class="edit-field-wrap">
+        <label class="edit-field-label">반</label>
+        <select class="inp edit-field-inp" id="editClassSel"></select>
+      </div>
+      <div class="edit-field-wrap">
+        <label class="edit-field-label">모둠</label>
+        <select class="inp edit-field-inp" id="editGroupSel"></select>
       </div>
     </div>
-    <input class="inp" id="editSpecies" type="text" placeholder="생물 이름" style="margin-bottom:10px;">
-    <input class="inp" id="editNotes" type="text" placeholder="메모" style="margin-bottom:10px;">
-    <select class="inp" id="editLocation" style="margin-bottom:10px;"></select>
-    <div style="display:flex;gap:8px;margin-top:4px;">
-      <button class="btn-sec" id="editCancel" style="flex:1;">취소</button>
-      <button class="btn-pri" id="editSave" style="flex:1;">저장</button>
+
+    <!-- 학번/이름 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div class="edit-field-wrap">
+        <label class="edit-field-label">학번</label>
+        <input class="inp edit-field-inp" id="editStudentId" type="text" placeholder="예) 10101" inputmode="numeric">
+      </div>
+      <div class="edit-field-wrap">
+        <label class="edit-field-label">이름</label>
+        <input class="inp edit-field-inp" id="editNameInp" type="text" placeholder="이름">
+      </div>
+    </div>
+
+    <!-- 생물 이름 -->
+    <div class="edit-field-wrap" style="margin-bottom:8px;">
+      <label class="edit-field-label">생물 이름</label>
+      <input class="inp edit-field-inp" id="editSpecies" type="text" placeholder="예) 민들레, 참새, 무당벌레">
+    </div>
+
+    <!-- 메모 -->
+    <div class="edit-field-wrap" style="margin-bottom:8px;">
+      <label class="edit-field-label">메모 <span style="font-weight:400;color:var(--txt2);">(생태 특성, 관찰 내용)</span></label>
+      <textarea class="inp edit-field-inp" id="editNotes" placeholder="예) 잎이 넓고 꽃이 노란색, 낙엽층 아래에서 발견…" rows="4"
+        style="resize:vertical;line-height:1.6;"></textarea>
+    </div>
+
+    <!-- 위치 -->
+    <div class="edit-field-wrap" style="margin-bottom:16px;">
+      <label class="edit-field-label">관찰 위치</label>
+      <select class="inp edit-field-inp" id="editLocation"></select>
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <button class="btn-sec" id="editCancel" style="flex:1;padding:13px;">취소</button>
+      <button class="btn-pri" id="editSave" style="flex:2;padding:13px;">저장하기</button>
     </div>
   </div>
 </div>
@@ -2636,10 +2679,8 @@ function openEditModal(id) {
   editingId = id;
   const obs = observations[id];
   if (!obs) return;
-  // 관리자 전용 필드 표시/숨김
-  const adminFields = document.getElementById('editAdminFields');
-  if (adminFields) adminFields.style.display = adminMode ? 'block' : 'none';
-  // 반 선택 드롭다운 채우기
+
+  // 반 선택
   const editClassSel = document.getElementById('editClassSel');
   editClassSel.innerHTML = '';
   for (let c = 1; c <= 11; c++) {
@@ -2651,11 +2692,22 @@ function openEditModal(id) {
   const testOpt = new Option('🧪 테스트반', '테스트반');
   if (obs.class === '테스트반') testOpt.selected = true;
   editClassSel.appendChild(testOpt);
+
+  // 모둠 선택
+  const editGroupSel = document.getElementById('editGroupSel');
+  editGroupSel.innerHTML = '';
+  ['1조','2조','3조','4조','5조','6조','7조','8조'].forEach(g => {
+    const o = new Option(g, g);
+    if (obs.group === g) o.selected = true;
+    editGroupSel.appendChild(o);
+  });
+
   document.getElementById('editStudentId').value = obs.studentId || '';
-  document.getElementById('editNameInp').value = obs.name || '';
-  document.getElementById('editSpecies').value = obs.species || '';
-  document.getElementById('editNotes').value = obs.notes || '';
-  // Build location select
+  document.getElementById('editNameInp').value   = obs.name      || '';
+  document.getElementById('editSpecies').value   = obs.species   || '';
+  document.getElementById('editNotes').value     = obs.notes     || '';
+
+  // 위치 선택
   const sel = document.getElementById('editLocation');
   sel.innerHTML = '';
   ZONES.forEach(z => {
@@ -2665,31 +2717,28 @@ function openEditModal(id) {
     if (z.id === obs.location) opt.selected = true;
     sel.appendChild(opt);
   });
-  // '기타' 옵션 추가
   const etcOpt = document.createElement('option');
   etcOpt.value = '기타'; etcOpt.textContent = '📍 기타';
   if (obs.location === '기타' || !ZONES.find(z => z.id === obs.location)) etcOpt.selected = true;
   sel.appendChild(etcOpt);
+
   document.getElementById('modalBg').classList.remove('open');
   document.getElementById('editModalBg').classList.add('open');
+  // 메모 칸에 자동 포커스
+  setTimeout(() => document.getElementById('editNotes').focus(), 200);
 }
 
 async function saveEdit() {
   if (!editingId) return;
+  const cls      = document.getElementById('editClassSel').value;
+  const group    = document.getElementById('editGroupSel').value;
+  const sid      = document.getElementById('editStudentId').value.trim();
+  const name     = document.getElementById('editNameInp').value.trim();
   const species  = document.getElementById('editSpecies').value.trim();
   const notes    = document.getElementById('editNotes').value.trim();
   const location = document.getElementById('editLocation').value;
   if (!species) { toast('생물 이름을 입력하세요.'); return; }
-  const updates = { species, notes, location };
-  // 관리자 모드: 학번/이름도 수정
-  if (adminMode) {
-    const cls  = document.getElementById('editClassSel').value;
-    const sid  = document.getElementById('editStudentId').value.trim();
-    const name = document.getElementById('editNameInp').value.trim();
-    if (cls)  updates.class = cls;
-    if (sid)  updates.studentId = sid;
-    if (name) updates.name = name;
-  }
+  const updates = { class: cls, group, studentId: sid, name, species, notes, location };
   try {
     await gasAPI('update', { id: editingId, data: updates });
     // 로컬 캐시 즉시 반영
