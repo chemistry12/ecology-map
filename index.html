@@ -1035,7 +1035,7 @@ let currentClassView = '';
 let themeMode = localStorage.getItem('theme') || 'auto';
 let adminMode = false;
 const ADMIN_PW = '1990';
-const TEST_CLASSES = ['테스트반'];
+const TEST_CLASSES = ['테스트반', '1학년 12반(테스트)'];
 
 // 비관리자에게 숨길 관측 필터
 function visibleEntries() {
@@ -2111,7 +2111,7 @@ function renderProgressBoard(isAll) {
   const CLASSES = [];
   for (let c = 1; c <= 11; c++) CLASSES.push(`1학년 ${c}반`);
   if (adminMode) {
-    CLASSES.push('테스트반'); // 관리자 모드에서만 표시
+    CLASSES.push('1학년 12반(테스트)'); // 관리자 모드에서만 표시
   }
 
   const ALL_GROUPS = ['1조','2조','3조','4조','5조','6조'];
@@ -2379,7 +2379,7 @@ function updateAdminUI() {
   const viewSel   = document.getElementById('classViewSel');
   // 관리자 전용 반 옵션 (테스트반, 12반(테스트)) 토글
   const ADMIN_CLASSES = [
-    { value: '테스트반', label: '🧪 테스트반' },
+    { value: '1학년 12반(테스트)', label: '🧪 1학년 12반(테스트)' },
   ];
   ['selClass', 'classViewSel'].forEach(selId => {
     const sel = document.getElementById(selId);
