@@ -326,9 +326,13 @@ textarea.inp { height: 80px; resize: none; }
 
 /* 전체화면 모드 */
 .map-fullscreen {
-  position: fixed !important; inset: 0 !important;
+  position: fixed !important;
+  top: 0 !important; left: 0 !important;
+  right: 0 !important; bottom: 0 !important;
   z-index: 8000 !important; border-radius: 0 !important;
-  height: 100dvh !important; width: 100dvw !important;
+  height: 100vh !important; width: 100vw !important;
+  max-height: none !important; min-height: unset !important;
+  margin: 0 !important;
 }
 .map-fs-btn {
   position: absolute; top: 10px; right: 10px; z-index: 1000;
@@ -1782,16 +1786,21 @@ function toggleMapFs(which) {
 
   if (_fsState[which]) {
     // 원래 위치 저장 후 body 바로 밑으로 이동
-    // (overflow:auto 조상 안에서는 position:fixed가 뷰포트 기준으로 작동 안 함)
     _fsOrigin[which] = { parent: el.parentNode, next: el.nextSibling };
     document.body.appendChild(el);
-    el.classList.add('map-fullscreen');
+    // 인라인 스타일로 강제 (ID 선택자 !important 규칙 우선순위 무시)
+    Object.assign(el.style, {
+      position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
+      width: '100vw', height: '100vh', zIndex: '8000',
+      borderRadius: '0', margin: '0'
+    });
     btn.textContent = '✕';
     btn.title = '닫기';
     document.body.style.overflow = 'hidden';
     if (overlay && isTouchDev) overlay.style.pointerEvents = 'auto';
   } else {
-    el.classList.remove('map-fullscreen');
+    // 인라인 스타일 초기화
+    ['position','top','left','right','bottom','width','height','zIndex','borderRadius','margin'].forEach(p => el.style[p] = '');
     // 원래 위치로 복원
     const { parent, next } = _fsOrigin[which] || {};
     if (parent) next ? parent.insertBefore(el, next) : parent.appendChild(el);
@@ -1802,8 +1811,8 @@ function toggleMapFs(which) {
     if (overlay && isTouchDev) overlay.style.pointerEvents = 'auto';
   }
   // Leaflet 크기 재계산
-  setTimeout(() => { if (mapL) mapL.invalidateSize(); }, 200);
-  setTimeout(() => { if (mapL) mapL.invalidateSize(); }, 500);
+  const maps = [mapL, classMapL].filter(Boolean);
+  [100, 300, 600].forEach(t => setTimeout(() => maps.forEach(m => m.invalidateSize()), t));
 }
 // ESC 키로 전체화면 닫기
 document.addEventListener('keydown', e => {
