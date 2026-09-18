@@ -2840,14 +2840,38 @@ function makeMineObsCard(id, obs, isAdmin) {
       lk.textContent = '🔒';
       card.appendChild(lk);
     } else {
-      const eb = document.createElement('button');
-      eb.style.cssText = 'flex-shrink:0;font-size:13px;font-weight:700;padding:5px 10px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--surf2);color:var(--txt2);cursor:pointer;';
-      eb.textContent = '✏️';
-      eb.onclick = (e) => { e.stopPropagation(); openEditModal(id); };
-      card.appendChild(eb);
+      // 메모 없으면 카드 하단에 눈에 띄는 버튼 추가
+      if (!obs.notes) {
+        const memoBtn = document.createElement('button');
+        memoBtn.style.cssText = `
+          position:absolute;bottom:10px;right:10px;
+          font-size:12px;font-weight:700;padding:5px 12px;
+          border-radius:99px;border:none;
+          background:var(--acc);color:#fff;cursor:pointer;
+          box-shadow:0 2px 8px rgba(245,146,10,.35);
+          white-space:nowrap;
+        `;
+        memoBtn.textContent = '📝 메모 추가';
+        memoBtn.onclick = (e) => { e.stopPropagation(); openEditModal(id); };
+        card.style.position = 'relative';
+        // body 하단 여백 확보
+        card.querySelector('.obs-card-body').style.paddingBottom = '30px';
+        card.appendChild(memoBtn);
+      } else {
+        const eb = document.createElement('button');
+        eb.style.cssText = 'flex-shrink:0;font-size:13px;font-weight:700;padding:5px 10px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--surf2);color:var(--txt2);cursor:pointer;';
+        eb.textContent = '✏️';
+        eb.onclick = (e) => { e.stopPropagation(); openEditModal(id); };
+        card.appendChild(eb);
+      }
     }
   }
-  card.querySelector('.obs-card-body').onclick = () => openModal(id, obs);
+  // 카드 전체 탭 → 수정 모달 (잠기지 않은 학생 기록)
+  card.onclick = (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+    if (!isAdmin && !obs.locked) { openEditModal(id); return; }
+    openModal(id, obs);
+  };
   return card;
 }
 
