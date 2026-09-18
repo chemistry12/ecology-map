@@ -870,9 +870,19 @@ textarea.inp { height: 80px; resize: none; }
           <input class="inp" id="mineStudentId" type="text" inputmode="numeric" placeholder="학번 입력 (예: 10101)" style="flex:1;max-width:180px;">
           <button class="btn-pri" id="mineLookupBtn" style="padding:10px 18px;">조회</button>
         </div>
-        <div id="mineAdminRow" style="display:none;padding:10px 16px 4px;display:none;align-items:center;justify-content:space-between;gap:8px;">
-          <span style="font-size:14px;font-weight:700;color:var(--pri);">🔓 전체 학생 기록</span>
-          <button id="lockAllMineBtn" onclick="lockAll()" style="font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;">🔒 전체 잠금</button>
+        <div id="mineAdminRow" style="display:none;padding:10px 16px 4px;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span style="font-size:14px;font-weight:700;color:var(--pri);">🔓 전체 학생 기록</span>
+            <button id="lockAllMineBtn" onclick="lockAll()" style="font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;">🔒 전체 잠금</button>
+          </div>
+          <select id="mineClassFilter" onchange="renderAllStudentRecords()" style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--surf2);color:var(--txt);font-size:14px;">
+            <option value="__all__">전체 반</option>
+            <option>1학년 1반</option><option>1학년 2반</option><option>1학년 3반</option>
+            <option>1학년 4반</option><option>1학년 5반</option><option>1학년 6반</option>
+            <option>1학년 7반</option><option>1학년 8반</option><option>1학년 9반</option>
+            <option>1학년 10반</option><option>1학년 11반</option>
+            <option>1학년 12반(테스트)</option>
+          </select>
         </div>
         <div id="mineCount" style="font-size:13px;color:var(--txt2);padding:0 16px 4px;"></div>
         <div class="obs-list" id="mineList"></div>
@@ -2205,6 +2215,11 @@ function openModal(id, obs, list) {
   }
   _renderModalContent(id, obs);
   document.getElementById('modalBg').classList.add('open');
+  history.pushState({ modal: 'obs' }, '');
+}
+
+function _closeModal() {
+  document.getElementById('modalBg').classList.remove('open');
 }
 
 function _renderModalContent(id, obs) {
@@ -2706,14 +2721,20 @@ function makeMineObsCard(id, obs, isAdmin) {
 function renderAllStudentRecords() {
   const count = document.getElementById('mineCount');
   const list  = document.getElementById('mineList');
-  const all   = Object.entries(observations).sort(([, a], [, b]) => {
-    const sa = (a.studentId || '￿').padStart(10, '0');
-    const sb = (b.studentId || '￿').padStart(10, '0');
-    return sa < sb ? -1 : sa > sb ? 1 : (b.timestamp - a.timestamp);
-  });
+  const filterSel = document.getElementById('mineClassFilter');
+  const filterCls = filterSel ? filterSel.value : '__all__';
+
+  const all = Object.entries(observations)
+    .filter(([, o]) => filterCls === '__all__' || o.class === filterCls)
+    .sort(([, a], [, b]) => {
+      const sa = (a.studentId || '￿').padStart(10, '0');
+      const sb = (b.studentId || '￿').padStart(10, '0');
+      return sa < sb ? -1 : sa > sb ? 1 : (b.timestamp - a.timestamp);
+    });
 
   const studentCount = [...new Set(all.map(([,o]) => o.studentId).filter(Boolean))].length;
-  count.innerHTML = `<div style="padding:6px 0 4px;font-size:13px;color:var(--txt2);">총 ${all.length}건 / ${studentCount}명</div>`;
+  const labelCls = filterCls === '__all__' ? '전체' : filterCls;
+  count.innerHTML = `<div style="padding:6px 0 4px;font-size:13px;color:var(--txt2);">${labelCls} · 총 ${all.length}건 / ${studentCount}명</div>`;
   list.innerHTML = '';
   if (all.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>기록이 없어요</p></div>`;
@@ -2811,11 +2832,13 @@ function bindUI() {
 
   // Modal close
   document.getElementById('modalClose').addEventListener('click', () => {
-    document.getElementById('modalBg').classList.remove('open');
+    if (history.state && history.state.modal) history.back();
+    else _closeModal();
   });
   document.getElementById('modalBg').addEventListener('click', e => {
     if (e.target === document.getElementById('modalBg')) {
-      document.getElementById('modalBg').classList.remove('open');
+      if (history.state && history.state.modal) history.back();
+      else _closeModal();
     }
   });
 
@@ -2856,12 +2879,39 @@ window.confirmDelete = confirmDelete;
   const img = document.createElement('img');
   lb.appendChild(img);
   document.body.appendChild(lb);
-  lb.addEventListener('click', () => lb.classList.remove('open'));
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('open'); });
+  function closeLightbox() { lb.classList.remove('open'); }
+  lb.addEventListener('click', () => {
+    if (history.state && history.state.modal === 'lightbox') history.back();
+    else closeLightbox();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (lb.classList.contains('open')) {
+        if (history.state && history.state.modal === 'lightbox') history.back();
+        else closeLightbox();
+      }
+    }
+  });
   window.openLightbox = function(src) {
     img.src = src;
     lb.classList.add('open');
+    history.pushState({ modal: 'lightbox' }, '');
   };
+  window._closeLightbox = closeLightbox;
+
+  // 뒤로가기 가로채기
+  window.addEventListener('popstate', e => {
+    // 라이트박스 열려있으면 먼저 닫기
+    if (lb.classList.contains('open')) {
+      closeLightbox();
+      return;
+    }
+    // 모달 열려있으면 닫기
+    const modalBg = document.getElementById('modalBg');
+    if (modalBg && modalBg.classList.contains('open')) {
+      _closeModal();
+    }
+  });
 })();
 
 /* ──── 모달 스와이프 네비게이션 ──── */
