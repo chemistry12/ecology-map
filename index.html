@@ -1540,7 +1540,7 @@ document.addEventListener('DOMContentLoaded', () => {
       autoSelectZone(gps.lat, gps.lon);
       toast('📍 사진 GPS 위치로 핀 설정됨');
     }
-    photoData = await compressImg(file, 300, 0.5);
+    photoData = await compressImg(file, 1200, 0.85);
     renderPhotoArea();
   });
 });
