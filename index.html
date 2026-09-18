@@ -1035,7 +1035,7 @@ let currentClassView = '';
 let themeMode = localStorage.getItem('theme') || 'auto';
 let adminMode = false;
 const ADMIN_PW = '1990';
-const TEST_CLASSES = ['테스트반', '1학년 12반(테스트)'];
+const TEST_CLASSES = ['테스트반'];
 
 // 비관리자에게 숨길 관측 필터
 function visibleEntries() {
@@ -1638,7 +1638,7 @@ window.clearStudentInfo = clearStudentInfo;
 
 /* 반 번호 → 학번 접두사 (1반→101, 10반→110) / 테스트반은 null 반환 → 제한 없음 */
 function expectedSidPrefix(classStr) {
-  if (!classStr || classStr === '테스트반' || classStr === '1학년 12반(테스트)') return null; // 테스트 반: 학번 제한 없음
+  if (!classStr || TEST_CLASSES.includes(classStr)) return null; // 테스트 반: 학번 제한 없음
   const m = classStr.match(/(\d+)반$/);
   if (!m) return null;
   const num = parseInt(m[1], 10);
@@ -1647,7 +1647,7 @@ function expectedSidPrefix(classStr) {
 
 function validateStudentId(cls, sid) {
   if (!sid) return null;
-  if (cls === '테스트반' || cls === '1학년 12반(테스트)') return null; // 테스트 반: 형식 검증 생략
+  if (TEST_CLASSES.includes(cls)) return null; // 테스트 반: 형식 검증 생략
   const prefix = expectedSidPrefix(cls);
   if (!prefix) return null;
   if (!sid.startsWith(prefix)) {
@@ -1889,7 +1889,7 @@ function renderMapPins() {
 
 function renderClassFilterChips() {
   const classesPresent = [...new Set(Object.values(observations).map(o => o.class))]
-    .filter(c => adminMode || (c !== '테스트반' && c !== '1학년 12반(테스트)'))
+    .filter(c => adminMode || !TEST_CLASSES.includes(c))
     .sort();
   const wrap = document.getElementById('classFilterChips');
   if (!wrap) return;
@@ -2111,8 +2111,7 @@ function renderProgressBoard(isAll) {
   const CLASSES = [];
   for (let c = 1; c <= 11; c++) CLASSES.push(`1학년 ${c}반`);
   if (adminMode) {
-    CLASSES.push('1학년 12반(테스트)'); // 관리자 모드에서만 표시
-    CLASSES.push('테스트반');           // 관리자 모드에서만 표시
+    CLASSES.push('테스트반'); // 관리자 모드에서만 표시
   }
 
   const ALL_GROUPS = ['1조','2조','3조','4조','5조','6조'];
@@ -2380,8 +2379,7 @@ function updateAdminUI() {
   const viewSel   = document.getElementById('classViewSel');
   // 관리자 전용 반 옵션 (테스트반, 12반(테스트)) 토글
   const ADMIN_CLASSES = [
-    { value: '1학년 12반(테스트)', label: '🧪 1학년 12반(테스트)' },
-    { value: '테스트반',            label: '🧪 테스트반' },
+    { value: '테스트반', label: '🧪 테스트반' },
   ];
   ['selClass', 'classViewSel'].forEach(selId => {
     const sel = document.getElementById(selId);
