@@ -130,6 +130,54 @@ img { max-width: 100%; }
   padding: 12px 14px; font-size: 13px; color: #7A5000; margin-top: 16px;
 }
 
+/* ── Profile Setup Overlay ── */
+#profileSetup {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; z-index: 9990;
+  padding: 24px 20px 48px; overflow-y: auto;
+}
+#profileSetup.hidden { display: none; }
+.profile-card {
+  width: 100%; max-width: 380px;
+  background: var(--surf); border-radius: 20px;
+  padding: 28px 24px; box-shadow: var(--shadow);
+}
+.profile-logo { text-align: center; font-size: 40px; margin-bottom: 8px; }
+.profile-title { text-align: center; font-size: 21px; font-weight: 800; color: var(--txt); margin-bottom: 4px; }
+.profile-subtitle { text-align: center; font-size: 13px; color: var(--txt2); margin-bottom: 24px; }
+.profile-fld { margin-bottom: 14px; }
+.profile-fld > label { font-size: 11px; font-weight: 700; color: var(--txt2); display: block; margin-bottom: 4px; letter-spacing: .04em; text-transform: uppercase; }
+.profile-row2 { display: flex; gap: 10px; }
+.profile-row2 .profile-fld { flex: 1; min-width: 0; }
+.profile-start-btn {
+  width: 100%; padding: 14px; margin-top: 8px;
+  background: var(--grad); color: #fff; border: none;
+  border-radius: 14px; font-size: 16px; font-weight: 800; cursor: pointer;
+}
+.profile-cancel-btn {
+  width: 100%; padding: 10px; margin-top: 8px;
+  background: transparent; color: var(--txt2); border: 1.5px solid var(--bdr);
+  border-radius: 14px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+
+/* ── Student Info Card (form) ── */
+#studentInfoCard {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surf2); border: 1.5px solid var(--pri-m);
+  border-radius: var(--r); padding: 10px 14px; margin-bottom: 10px;
+}
+#studentInfoCard.hidden { display: none; }
+.stu-icon { font-size: 22px; flex-shrink: 0; }
+.stu-text { flex: 1; line-height: 1.6; }
+.stu-text strong { display: block; font-size: 15px; font-weight: 700; color: var(--txt); }
+.stu-text span { font-size: 12px; color: var(--txt2); }
+.stu-change-btn {
+  font-size: 12px; padding: 5px 12px; border-radius: 99px;
+  border: 1.5px solid var(--bdr); background: var(--surf);
+  color: var(--txt); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+
 /* ───── App Shell ───── */
 #app { display: flex; flex-direction: column; height: 100%; }
 .topbar {
@@ -834,6 +882,47 @@ body.map-fs-active #mainMapContainer {
   </div>
 </div>
 
+<!-- ══════════════════════ PROFILE SETUP ══════════════════════ -->
+<div id="profileSetup" class="hidden">
+  <div class="profile-card">
+    <div class="profile-logo">🌿</div>
+    <div class="profile-title">영생고 생태지도</div>
+    <div class="profile-subtitle">시작 전에 내 정보를 입력해요</div>
+
+    <div class="profile-row2">
+      <div class="profile-fld">
+        <label>학년·반</label>
+        <select class="inp" id="profileClass">
+          <option value="">선택</option>
+        </select>
+      </div>
+      <div class="profile-fld">
+        <label>조</label>
+        <select class="inp" id="profileGroup">
+          <option value="">선택</option>
+          <option>1조</option><option>2조</option><option>3조</option>
+          <option>4조</option><option>5조</option><option>6조</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="profile-fld">
+      <label>학번</label>
+      <input class="inp" id="profileStudentId" type="text" placeholder="예: 10101" inputmode="numeric" autocomplete="off">
+    </div>
+
+    <div class="profile-fld">
+      <label>이름</label>
+      <input class="inp" id="profileName" type="text" placeholder="홍길동" autocomplete="off">
+    </div>
+
+    <div id="profileError" style="display:none;font-size:13px;color:var(--danger);margin-top:4px;margin-bottom:-4px;"></div>
+
+    <button class="profile-start-btn" onclick="saveProfileAndStart()">시작하기 🌱</button>
+    <button class="profile-cancel-btn hidden" id="profileCancelBtn" onclick="closeProfileSetup()">취소</button>
+  </div>
+</div>
+
 <!-- ══════════════════════ MAIN APP ══════════════════════ -->
 <div id="app" style="display:none;">
   <!-- Top Bar -->
@@ -851,32 +940,38 @@ body.map-fs-active #mainMapContainer {
     <div class="tab-pane active" id="tab-record">
       <div class="form-wrap">
 
-        <!-- 학생 정보 고정 안내 -->
-        <div id="studentFixedBanner" style="display:none;background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--r);padding:8px 12px;margin-bottom:10px;font-size:13px;color:var(--txt2);display:flex;align-items:center;justify-content:space-between;gap:8px;">
-          <span>📌 학생 정보가 고정되어 있어요</span>
-          <button type="button" style="font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt);cursor:pointer;" onclick="clearStudentInfo()">초기화</button>
-        </div>
-
-        <!-- 학급 / 조 / 학번 / 이름 -->
-        <div class="form-section">
-          <label>학급 & 조</label>
-          <div class="row2">
-            <select class="inp" id="selClass">
-              <option value="">학년·반 선택</option>
-            </select>
-            <select class="inp" id="selGroup">
-              <option value="">조 선택</option>
-              <option>1조</option><option>2조</option><option>3조</option>
-              <option>4조</option><option>5조</option><option>6조</option>
-            </select>
+        <!-- 학생 정보 카드 (저장 시 표시) -->
+        <div id="studentInfoCard" class="hidden">
+          <span class="stu-icon">🧑‍🎓</span>
+          <div class="stu-text">
+            <strong id="studentCardName">이름</strong>
+            <span id="studentCardMeta">학년반 · 조 · 학번</span>
           </div>
+          <button type="button" class="stu-change-btn" onclick="showProfileSetup(true)">✏️ 변경</button>
         </div>
 
-        <div class="form-section">
-          <label>학번 & 이름</label>
-          <div class="row2">
-            <input class="inp" id="inpStudentId" type="text" placeholder="학번 (예: 10101)" inputmode="numeric" autocomplete="off">
-            <input class="inp" id="inpName" type="text" placeholder="이름" autocomplete="off">
+        <!-- 학급 / 조 / 학번 / 이름 (프로필 없을 때 표시) -->
+        <div id="formStudentFields">
+          <div class="form-section">
+            <label>학급 & 조</label>
+            <div class="row2">
+              <select class="inp" id="selClass">
+                <option value="">학년·반 선택</option>
+              </select>
+              <select class="inp" id="selGroup">
+                <option value="">조 선택</option>
+                <option>1조</option><option>2조</option><option>3조</option>
+                <option>4조</option><option>5조</option><option>6조</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <label>학번 & 이름</label>
+            <div class="row2">
+              <input class="inp" id="inpStudentId" type="text" placeholder="학번 (예: 10101)" inputmode="numeric" autocomplete="off">
+              <input class="inp" id="inpName" type="text" placeholder="이름" autocomplete="off">
+            </div>
           </div>
         </div>
 
@@ -1054,8 +1149,8 @@ body.map-fs-active #mainMapContainer {
       <span style="font-size:17px;font-weight:800;color:var(--txt);">기록 수정</span>
     </div>
 
-    <!-- 반/모둠 -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+    <!-- 반/모둠 (관리자 전용) -->
+    <div id="editClassRow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
       <div class="edit-field-wrap">
         <label class="edit-field-label">반</label>
         <select class="inp edit-field-inp" id="editClassSel"></select>
@@ -1066,8 +1161,8 @@ body.map-fs-active #mainMapContainer {
       </div>
     </div>
 
-    <!-- 학번/이름 -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+    <!-- 학번/이름 (관리자 전용) -->
+    <div id="editStudentRow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
       <div class="edit-field-wrap">
         <label class="edit-field-label">학번</label>
         <input class="inp edit-field-inp" id="editStudentId" type="text" placeholder="예) 10101" inputmode="numeric">
@@ -1215,11 +1310,15 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('setup').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   initApp();
+  // 프로필이 없으면 입력 화면 표시
+  const saved = loadStudentInfo();
+  if (!saved) showProfileSetup(false);
 });
 
 function initApp() {
   applyTheme();
   buildClassSelect();
+  buildProfileClassSelect();
   initFormMap();
   initFirebase();
   bindUI();
@@ -1789,30 +1888,140 @@ function loadStudentInfo() {
 
 function applyStudentInfo() {
   const info = loadStudentInfo();
-  const banner = document.getElementById('studentFixedBanner');
-  if (!info) { if (banner) banner.style.display = 'none'; return; }
+  const card   = document.getElementById('studentInfoCard');
+  const fields = document.getElementById('formStudentFields');
+
+  if (!info) {
+    if (card) card.classList.add('hidden');
+    if (fields) fields.style.display = '';
+    return;
+  }
+
+  // 폼 필드에 값 채우기 (제출 로직이 계속 읽음)
   const selClass = document.getElementById('selClass');
   const selGroup = document.getElementById('selGroup');
   if (info.cls) selClass.value = info.cls;
   if (info.grp) selGroup.value = info.grp;
   if (info.sid) document.getElementById('inpStudentId').value = info.sid;
   if (info.name) document.getElementById('inpName').value = info.name;
-  if (banner) banner.style.display = 'flex';
+
+  // 카드 업데이트
+  const nameEl = document.getElementById('studentCardName');
+  const metaEl = document.getElementById('studentCardMeta');
+  if (nameEl) nameEl.textContent = info.name || '—';
+  if (metaEl) metaEl.textContent = [info.cls, info.grp, info.sid].filter(Boolean).join(' · ');
+
+  if (card) card.classList.remove('hidden');
+  if (fields) fields.style.display = 'none';
+
+  // 내 기록 탭: 프로필 있으면 학번 자동 입력
+  const mineInput = document.getElementById('mineStudentId');
+  if (mineInput && info.sid && !mineInput.value) mineInput.value = info.sid;
 }
 
 function clearStudentInfo() {
   try { localStorage.removeItem(STUDENT_KEY); } catch(e) {}
-  const banner = document.getElementById('studentFixedBanner');
-  if (banner) banner.style.display = 'none';
+  const card   = document.getElementById('studentInfoCard');
+  const fields = document.getElementById('formStudentFields');
+  if (card) card.classList.add('hidden');
+  if (fields) fields.style.display = '';
   document.getElementById('selClass').selectedIndex = 0;
   document.getElementById('selGroup').selectedIndex = 0;
   document.getElementById('inpStudentId').value = '';
   document.getElementById('inpName').value = '';
   const hint = document.getElementById('sidHint');
   if (hint) hint.textContent = '';
-  toast('학생 정보가 초기화되었어요');
+  showProfileSetup(false);
 }
 window.clearStudentInfo = clearStudentInfo;
+
+/* ──── Profile Setup Overlay ──── */
+function showProfileSetup(canClose) {
+  const overlay = document.getElementById('profileSetup');
+  const cancelBtn = document.getElementById('profileCancelBtn');
+  if (!overlay) return;
+
+  // 기존 프로필 있으면 미리 채우기
+  const info = loadStudentInfo();
+  if (info) {
+    const pc = document.getElementById('profileClass');
+    const pg = document.getElementById('profileGroup');
+    const ps = document.getElementById('profileStudentId');
+    const pn = document.getElementById('profileName');
+    if (pc && info.cls) pc.value = info.cls;
+    if (pg && info.grp) pg.value = info.grp;
+    if (ps && info.sid) ps.value = info.sid;
+    if (pn && info.name) pn.value = info.name;
+  }
+
+  // profileClass 옵션 채우기 (buildClassSelect 이후)
+  buildProfileClassSelect();
+
+  if (cancelBtn) {
+    if (canClose) cancelBtn.classList.remove('hidden');
+    else cancelBtn.classList.add('hidden');
+  }
+
+  const err = document.getElementById('profileError');
+  if (err) err.style.display = 'none';
+
+  overlay.classList.remove('hidden');
+}
+
+function closeProfileSetup() {
+  const overlay = document.getElementById('profileSetup');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+function buildProfileClassSelect() {
+  const sel = document.getElementById('profileClass');
+  if (!sel || sel.dataset.built === '1') return;
+  sel.innerHTML = '<option value="">선택</option>';
+  for (let c = 1; c <= 11; c++) {
+    const v = `1학년 ${c}반`;
+    const o = new Option(v, v);
+    sel.appendChild(o);
+  }
+  sel.appendChild(new Option('🧪 테스트반', '테스트반'));
+  sel.dataset.built = '1';
+  // 기존 저장값 재적용
+  const info = loadStudentInfo();
+  if (info && info.cls) sel.value = info.cls;
+}
+
+function saveProfileAndStart() {
+  const cls  = document.getElementById('profileClass').value;
+  const grp  = document.getElementById('profileGroup').value;
+  const sid  = document.getElementById('profileStudentId').value.trim();
+  const name = document.getElementById('profileName').value.trim();
+
+  const err = document.getElementById('profileError');
+  function showErr(msg) { if (err) { err.textContent = msg; err.style.display = 'block'; } }
+
+  if (!cls)  { showErr('⚠️ 학년·반을 선택하세요'); return; }
+  if (!grp)  { showErr('⚠️ 조를 선택하세요'); return; }
+  if (!name) { showErr('⚠️ 이름을 입력하세요'); return; }
+  if (!sid)  { showErr('⚠️ 학번을 입력하세요'); return; }
+  const sidErr = validateStudentId(cls, sid);
+  if (sidErr) { showErr(sidErr); return; }
+
+  saveStudentInfo(cls, grp, sid, name);
+  closeProfileSetup();
+  applyStudentInfo();
+  toast('✅ 정보가 저장됐어요!');
+}
+window.showProfileSetup = showProfileSetup;
+window.closeProfileSetup = closeProfileSetup;
+window.saveProfileAndStart = saveProfileAndStart;
+
+/* ──── Edit Permission ──── */
+function canEditRecord(obs) {
+  if (adminMode) return true;
+  if (obs.locked) return false;
+  const info = loadStudentInfo();
+  if (!info) return false;
+  return info.sid === obs.studentId && info.name === obs.name;
+}
 
 /* 반 번호 → 학번 접두사 (1반→101, 10반→110) / 테스트반은 null 반환 → 제한 없음 */
 function expectedSidPrefix(classStr) {
@@ -1892,8 +2101,7 @@ async function handleSubmit() {
       onData();
     }
     saveStudentInfo(cls, grp, sid, name);
-    const banner = document.getElementById('studentFixedBanner');
-    if (banner) banner.style.display = 'flex';
+    applyStudentInfo();
     // 내 총 기록 수 계산
     const myTotal = sid ? Object.values(observations).filter(o => o.studentId === sid).length : 1;
     resetForm();
@@ -2473,14 +2681,17 @@ function switchTab(tabId) {
       if (adminRow)   adminRow.style.display   = 'flex';
       renderAllStudentRecords();
     } else {
-      if (studentRow) studentRow.style.display = '';
-      if (adminRow)   adminRow.style.display   = 'none';
-      // 저장된 학번이 있으면 자동 조회
+      if (adminRow) adminRow.style.display = 'none';
+      // 프로필 저장 여부에 따라 검색창 표시 / 자동 조회
       const info = loadStudentInfo();
       if (info && info.sid) {
+        // 프로필 있으면 검색창 숨기고 자동 조회
+        if (studentRow) studentRow.style.display = 'none';
         const mineInput = document.getElementById('mineStudentId');
-        if (mineInput && !mineInput.value) mineInput.value = info.sid;
+        if (mineInput) mineInput.value = info.sid;
         lookupMine();
+      } else {
+        if (studentRow) studentRow.style.display = '';
       }
     }
   }
@@ -2679,6 +2890,19 @@ function openEditModal(id) {
   editingId = id;
   const obs = observations[id];
   if (!obs) return;
+
+  // 수정 권한 확인
+  if (!canEditRecord(obs)) {
+    toast('✏️ 자신의 기록만 수정할 수 있어요 (학번+이름 불일치)');
+    return;
+  }
+
+  // 관리자가 아닌 학생은 반/조/학번/이름 필드 숨김
+  const isAdminEdit = adminMode;
+  ['editClassRow','editGroupRow','editStudentRow','editNameRow'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isAdminEdit ? '' : 'none';
+  });
 
   // 반 선택
   const editClassSel = document.getElementById('editClassSel');
