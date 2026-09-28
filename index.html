@@ -1879,11 +1879,11 @@ function compressImg(file, max, q) {
 const STUDENT_KEY = 'ys_student_info';
 
 function saveStudentInfo(cls, grp, sid, name) {
-  try { localStorage.setItem(STUDENT_KEY, JSON.stringify({ cls, grp, sid, name })); } catch(e) {}
+  try { sessionStorage.setItem(STUDENT_KEY, JSON.stringify({ cls, grp, sid, name })); } catch(e) {}
 }
 
 function loadStudentInfo() {
-  try { return JSON.parse(localStorage.getItem(STUDENT_KEY) || 'null'); } catch(e) { return null; }
+  try { return JSON.parse(sessionStorage.getItem(STUDENT_KEY) || 'null'); } catch(e) { return null; }
 }
 
 function applyStudentInfo() {
@@ -1920,7 +1920,7 @@ function applyStudentInfo() {
 }
 
 function clearStudentInfo() {
-  try { localStorage.removeItem(STUDENT_KEY); } catch(e) {}
+  try { sessionStorage.removeItem(STUDENT_KEY); } catch(e) {}
   const card   = document.getElementById('studentInfoCard');
   const fields = document.getElementById('formStudentFields');
   if (card) card.classList.add('hidden');
