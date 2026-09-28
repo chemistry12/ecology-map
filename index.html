@@ -2032,7 +2032,7 @@ function buildProfileClassSelect() {
     const o = new Option(v, v);
     sel.appendChild(o);
   }
-  sel.appendChild(new Option('🧪 테스트반', '테스트반'));
+  // 테스트반은 학생 로그인 화면에 표시 안 함 (관리자 전용)
   sel.dataset.built = '1';
   // 기존 저장값 재적용
   const info = loadStudentInfo();
