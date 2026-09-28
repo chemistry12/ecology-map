@@ -2770,6 +2770,7 @@ function _closeModal() {
 function _renderModalContent(id, obs) {
   const zone = ZONES.find(z => z.id === obs.location);
   const isLocked = !!obs.locked;
+  const canEdit = canEditRecord(obs);
   const adminActions = adminMode ? `
     <div class="admin-actions">
       <button class="btn-edit" onclick="openEditModal('${id}')">✏️ 수정</button>
@@ -2777,7 +2778,12 @@ function _renderModalContent(id, obs) {
     </div>
     <button onclick="toggleLock('${id}',${isLocked})" style="width:100%;padding:9px;border-radius:8px;font-size:13px;font-weight:700;margin-top:8px;border:1.5px solid ${isLocked ? 'var(--pri)' : 'var(--bdr)'};background:var(--surf2);color:${isLocked ? 'var(--pri)' : 'var(--txt2)'};cursor:pointer;">
       ${isLocked ? '🔓 잠금 해제' : '🔒 잠그기 (학생 수정 불가)'}
-    </button>` : '';
+    </button>`
+  : canEdit ? `
+    <div class="admin-actions">
+      <button class="btn-edit" onclick="openEditModal('${id}')">✏️ 내 기록 수정</button>
+      <button class="btn-del" onclick="confirmDelete('${id}', '${obs.species}')">🗑️ 삭제</button>
+    </div>` : '';
   document.getElementById('modalContent').innerHTML = `
     ${obs.photo ? `<img class="modal-img" src="${obs.photo}" alt="${obs.species}" onclick="openLightbox(this.src)">` : ''}
     <div class="modal-body">
