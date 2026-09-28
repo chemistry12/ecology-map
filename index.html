@@ -173,6 +173,21 @@ img { max-width: 100%; }
   background: transparent; color: var(--txt2); border: 1.5px solid var(--bdr);
   border-radius: 14px; font-size: 14px; font-weight: 600; cursor: pointer;
 }
+.profile-admin-section {
+  margin-top: 20px; padding-top: 16px;
+  border-top: 1px solid var(--bdr); text-align: center;
+}
+.profile-admin-link {
+  background: none; border: none; color: var(--txt2);
+  font-size: 12px; font-weight: 600; cursor: pointer; opacity: .7;
+  padding: 4px 8px;
+}
+.profile-admin-link:active { opacity: 1; }
+.profile-admin-enter-btn {
+  width: 100%; padding: 11px; margin-top: 8px;
+  background: var(--surf2); color: var(--pri-d); border: 1.5px solid var(--pri-m);
+  border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
+}
 
 /* ── Student Info Card (form) ── */
 #studentInfoCard {
@@ -938,6 +953,17 @@ body.map-fs-active #mainMapContainer {
 
       <button class="profile-start-btn" onclick="saveProfileAndStart()">시작하기 🌱</button>
       <button class="profile-cancel-btn hidden" id="profileCancelBtn" onclick="closeProfileSetup()">← 돌아가기</button>
+
+      <!-- 관리자 입장 -->
+      <div class="profile-admin-section">
+        <button type="button" class="profile-admin-link" onclick="toggleAdminEntry()">🔒 관리자 입장</button>
+        <div id="profileAdminBox" style="display:none;margin-top:10px;">
+          <input class="inp" id="profileAdminPw" type="password" placeholder="비밀번호" autocomplete="off"
+            onkeydown="if(event.key==='Enter')adminDirectEntry()">
+          <div id="profileAdminErr" style="display:none;font-size:12px;color:var(--danger);margin-top:4px;"></div>
+          <button class="profile-admin-enter-btn" onclick="adminDirectEntry()">관리자로 입장 →</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -2044,6 +2070,37 @@ function saveProfileAndStart() {
 window.showProfileSetup = showProfileSetup;
 window.closeProfileSetup = closeProfileSetup;
 window.saveProfileAndStart = saveProfileAndStart;
+
+function toggleAdminEntry() {
+  const box = document.getElementById('profileAdminBox');
+  if (!box) return;
+  const showing = box.style.display !== 'none';
+  box.style.display = showing ? 'none' : 'block';
+  if (!showing) setTimeout(() => document.getElementById('profileAdminPw').focus(), 80);
+}
+
+function adminDirectEntry() {
+  const pw = document.getElementById('profileAdminPw').value;
+  const err = document.getElementById('profileAdminErr');
+  if (pw !== ADMIN_PW) {
+    if (err) { err.textContent = '⚠️ 비밀번호가 틀렸어요'; err.style.display = 'block'; }
+    return;
+  }
+  // 관리자 모드로 앱 진입
+  adminMode = true;
+  const overlay = document.getElementById('profileSetup');
+  if (overlay) { overlay.style.display = 'none'; overlay.classList.add('hidden'); }
+  const appEl = document.getElementById('app');
+  appEl.style.display = 'flex';
+  appEl.classList.add('admin-active');
+  document.getElementById('adminBtn').textContent = '🔓';
+  document.getElementById('csvBtn').style.display = '';
+  toast('🔓 관리자 모드로 입장했어요');
+  renderClassView();
+  updateAdminUI();
+}
+window.toggleAdminEntry = toggleAdminEntry;
+window.adminDirectEntry = adminDirectEntry;
 
 /* ──── Edit Permission ──── */
 function canEditRecord(obs) {
