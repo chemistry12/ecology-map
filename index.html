@@ -225,6 +225,13 @@ img { max-width: 100%; }
   color: #fff; transition: background .15s;
 }
 .icon-btn:active { background: rgba(255,255,255,.32); }
+.topbar-text-btn {
+  background: rgba(255,255,255,.18); color: #fff;
+  border: none; border-radius: 10px;
+  font-size: 12px; font-weight: 700; padding: 6px 10px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.topbar-text-btn:active { background: rgba(255,255,255,.32); }
 
 /* ───── Tab Content ───── */
 .tab-content { flex: 1; overflow: hidden; position: relative; }
@@ -281,14 +288,22 @@ textarea.inp { height: 80px; resize: none; }
 .photo-area {
   border: 2px dashed var(--bdr); border-radius: var(--r);
   background: var(--surf2);
-  flex: 1; aspect-ratio: 4/3;
+  flex: 1; min-height: 180px;
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 8px; cursor: pointer;
   transition: border-color .2s; position: relative; overflow: hidden;
   min-width: 0;
 }
 .photo-area:active { border-color: var(--pri); }
-.photo-area img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 10px; background: var(--bg); }
+/* 사진 있을 때: 이미지 비율에 맞게 높이 자동 조절 */
+.photo-area.has-photo { min-height: unset; }
+.photo-area.has-photo img {
+  position: relative; width: 100%; height: auto;
+  max-height: 55vh; object-fit: contain;
+  border-radius: 10px; display: block;
+}
+/* 사진 없을 때 */
+.photo-area:not(.has-photo) img { display: none; }
 .photo-area .photo-hint { font-size: 13px; color: var(--txt2); text-align: center; z-index: 1; }
 .photo-area .photo-icon { font-size: 32px; z-index: 1; }
 /* 교체/삭제 버튼 사이드 패널 */
@@ -989,7 +1004,7 @@ body.map-fs-active #mainMapContainer {
     <button class="icon-btn" id="adminBtn" title="관리자 모드">🔒</button>
     <button class="icon-btn" id="csvBtn" title="CSV 내보내기 (관리자)" style="display:none;" onclick="exportCSV()">📥</button>
     <button class="icon-btn" id="themeBtn" title="다크모드 전환">🌙</button>
-    <button class="icon-btn" id="logoutBtn" title="로그아웃" onclick="logoutToProfile()">🚪</button>
+    <button class="topbar-text-btn" id="logoutBtn" onclick="logoutToProfile()">처음화면</button>
   </div>
 
   <!-- Tab Content -->
@@ -1397,18 +1412,29 @@ function initApp() {
 }
 
 /* ──── 뒤로가기 가드 (모바일 실수 방지) ──── */
-function initBackGuard() {
-  // 앱 진입 시 히스토리 스택에 상태 하나 추가
-  history.pushState({ ecologyApp: true }, '', location.href);
+function pushAppState() {
+  // 스택을 3개 유지해서 연속 뒤로가기도 막음
+  for (let i = 0; i < 3; i++) {
+    history.pushState({ ecologyApp: true }, '', location.href);
+  }
+}
 
-  window.addEventListener('popstate', () => {
-    // 모달이 열려있으면 닫고 스택 유지
+function initBackGuard() {
+  pushAppState();
+
+  window.addEventListener('popstate', (e) => {
+    // 모달이 열려있으면 닫기
     const modalBg     = document.getElementById('modalBg');
     const editModalBg = document.getElementById('editModalBg');
-    if (modalBg     && modalBg.classList.contains('open'))     { modalBg.classList.remove('open'); }
-    if (editModalBg && editModalBg.classList.contains('open')) { editModalBg.classList.remove('open'); }
-    // 앱 안에 머물도록 스택 다시 쌓기
-    history.pushState({ ecologyApp: true }, '', location.href);
+    let closedModal = false;
+    if (modalBg     && modalBg.classList.contains('open'))     { modalBg.classList.remove('open');     closedModal = true; }
+    if (editModalBg && editModalBg.classList.contains('open')) { editModalBg.classList.remove('open'); closedModal = true; }
+
+    // 앱 화면이 보이는 경우 스택 다시 보충 (앱 밖으로 절대 나가지 않음)
+    const appVisible = document.getElementById('app').style.display !== 'none';
+    if (appVisible) {
+      pushAppState();
+    }
   });
 }
 
@@ -1895,12 +1921,13 @@ function renderPhotoArea() {
   const area = document.getElementById('photoArea');
   if (!area) return;
   if (photoData) {
-    area.innerHTML = `
-      <img src="${photoData}" alt="업로드 사진" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:10px;background:var(--bg);">`;
+    area.classList.add('has-photo');
+    area.innerHTML = `<img src="${photoData}" alt="업로드 사진">`;
     const sideBtns = document.getElementById('photoSideBtns');
     if (sideBtns) sideBtns.style.display = 'flex';
     area.onclick = null;
   } else {
+    area.classList.remove('has-photo');
     area.innerHTML = `<div class="photo-icon">📷</div><div class="photo-hint">탭하여 사진 촬영 또는 선택</div>`;
     area.onclick = () => document.getElementById('photoInput').click();
     const sideBtns = document.getElementById('photoSideBtns');
