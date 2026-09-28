@@ -1310,9 +1310,8 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('setup').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   initApp();
-  // 프로필이 없으면 입력 화면 표시
-  const saved = loadStudentInfo();
-  if (!saved) showProfileSetup(false);
+  // 항상 프로필 입력 화면 표시 (이전 데이터는 폼에 미리 채워짐)
+  showProfileSetup(false);
 });
 
 function initApp() {
@@ -1879,11 +1878,11 @@ function compressImg(file, max, q) {
 const STUDENT_KEY = 'ys_student_info';
 
 function saveStudentInfo(cls, grp, sid, name) {
-  try { sessionStorage.setItem(STUDENT_KEY, JSON.stringify({ cls, grp, sid, name })); } catch(e) {}
+  try { localStorage.setItem(STUDENT_KEY, JSON.stringify({ cls, grp, sid, name })); } catch(e) {}
 }
 
 function loadStudentInfo() {
-  try { return JSON.parse(sessionStorage.getItem(STUDENT_KEY) || 'null'); } catch(e) { return null; }
+  try { return JSON.parse(localStorage.getItem(STUDENT_KEY) || 'null'); } catch(e) { return null; }
 }
 
 function applyStudentInfo() {
@@ -1920,7 +1919,7 @@ function applyStudentInfo() {
 }
 
 function clearStudentInfo() {
-  try { sessionStorage.removeItem(STUDENT_KEY); } catch(e) {}
+  try { localStorage.removeItem(STUDENT_KEY); } catch(e) {}
   const card   = document.getElementById('studentInfoCard');
   const fields = document.getElementById('formStudentFields');
   if (card) card.classList.add('hidden');
