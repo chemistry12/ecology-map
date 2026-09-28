@@ -976,6 +976,7 @@ body.map-fs-active #mainMapContainer {
     <button class="icon-btn" id="adminBtn" title="관리자 모드">🔒</button>
     <button class="icon-btn" id="csvBtn" title="CSV 내보내기 (관리자)" style="display:none;" onclick="exportCSV()">📥</button>
     <button class="icon-btn" id="themeBtn" title="다크모드 전환">🌙</button>
+    <button class="icon-btn" id="logoutBtn" title="로그아웃" onclick="logoutToProfile()">🚪</button>
   </div>
 
   <!-- Tab Content -->
@@ -985,8 +986,8 @@ body.map-fs-active #mainMapContainer {
     <div class="tab-pane active" id="tab-record">
       <div class="form-wrap">
 
-        <!-- 학생 정보 카드 (저장 시 표시) -->
-        <div id="studentInfoCard" class="hidden">
+        <!-- 학생 정보 카드 (항상 표시 - 로그인 필수) -->
+        <div id="studentInfoCard">
           <span class="stu-icon">🧑‍🎓</span>
           <div class="stu-text">
             <strong id="studentCardName">이름</strong>
@@ -995,8 +996,8 @@ body.map-fs-active #mainMapContainer {
           <button type="button" class="stu-change-btn" onclick="showProfileSetup(true)">✏️ 변경</button>
         </div>
 
-        <!-- 학급 / 조 / 학번 / 이름 (프로필 없을 때 표시) -->
-        <div id="formStudentFields">
+        <!-- 학급 / 조 / 학번 / 이름 (숨김 - 로그인에서 이미 입력, 제출 로직용으로만 유지) -->
+        <div id="formStudentFields" style="display:none">
           <div class="form-section">
             <label>학급 & 조</label>
             <div class="row2">
@@ -1936,43 +1937,34 @@ function loadStudentInfo() {
 
 function applyStudentInfo() {
   const info = loadStudentInfo();
-  const card   = document.getElementById('studentInfoCard');
+
+  // formStudentFields는 항상 숨김 (로그인 화면에서 이미 입력)
   const fields = document.getElementById('formStudentFields');
-
-  if (!info) {
-    if (card) card.classList.add('hidden');
-    if (fields) fields.style.display = '';
-    return;
-  }
-
-  // 폼 필드에 값 채우기 (제출 로직이 계속 읽음)
-  const selClass = document.getElementById('selClass');
-  const selGroup = document.getElementById('selGroup');
-  if (info.cls) selClass.value = info.cls;
-  if (info.grp) selGroup.value = info.grp;
-  if (info.sid) document.getElementById('inpStudentId').value = info.sid;
-  if (info.name) document.getElementById('inpName').value = info.name;
-
-  // 카드 업데이트
-  const nameEl = document.getElementById('studentCardName');
-  const metaEl = document.getElementById('studentCardMeta');
-  if (nameEl) nameEl.textContent = info.name || '—';
-  if (metaEl) metaEl.textContent = [info.cls, info.grp, info.sid].filter(Boolean).join(' · ');
-
-  if (card) card.classList.remove('hidden');
   if (fields) fields.style.display = 'none';
 
-  // 내 기록 탭: 프로필 있으면 학번 자동 입력
+  // 숨겨진 폼 필드에 값 채우기 (제출 로직이 읽음)
+  const selClass = document.getElementById('selClass');
+  const selGroup = document.getElementById('selGroup');
+  if (info && info.cls && selClass) selClass.value = info.cls;
+  if (info && info.grp && selGroup) selGroup.value = info.grp;
+  if (info && info.sid) document.getElementById('inpStudentId').value = info.sid;
+  if (info && info.name) document.getElementById('inpName').value = info.name;
+
+  // 카드에 이름/정보 표시 (항상 보임)
+  const card   = document.getElementById('studentInfoCard');
+  const nameEl = document.getElementById('studentCardName');
+  const metaEl = document.getElementById('studentCardMeta');
+  if (nameEl) nameEl.textContent = info ? (info.name || '—') : '—';
+  if (metaEl) metaEl.textContent = info ? [info.cls, info.grp, info.sid].filter(Boolean).join(' · ') : '';
+  if (card) card.classList.remove('hidden');
+
+  // 내 기록 탭: 학번 자동 입력
   const mineInput = document.getElementById('mineStudentId');
-  if (mineInput && info.sid && !mineInput.value) mineInput.value = info.sid;
+  if (mineInput && info && info.sid && !mineInput.value) mineInput.value = info.sid;
 }
 
 function clearStudentInfo() {
   try { localStorage.removeItem(STUDENT_KEY); } catch(e) {}
-  const card   = document.getElementById('studentInfoCard');
-  const fields = document.getElementById('formStudentFields');
-  if (card) card.classList.add('hidden');
-  if (fields) fields.style.display = '';
   document.getElementById('selClass').selectedIndex = 0;
   document.getElementById('selGroup').selectedIndex = 0;
   document.getElementById('inpStudentId').value = '';
@@ -2025,6 +2017,11 @@ function closeProfileSetup() {
   const overlay = document.getElementById('profileSetup');
   if (overlay) { overlay.style.display = 'none'; overlay.classList.add('hidden'); }
   document.getElementById('app').style.display = 'flex';
+  setTimeout(() => {
+    if (formMapL) formMapL.invalidateSize();
+    if (mainMapL) mainMapL.invalidateSize();
+    if (classMapL) classMapL.invalidateSize();
+  }, 100);
 }
 
 function buildProfileClassSelect() {
@@ -2066,6 +2063,12 @@ function saveProfileAndStart() {
   document.getElementById('app').style.display = 'flex';
   applyStudentInfo();
   toast('✅ 정보가 저장됐어요!');
+  // 지도 크기 재계산 (display:none 상태에서 초기화됐으므로 필수)
+  setTimeout(() => {
+    if (formMapL) formMapL.invalidateSize();
+    if (mainMapL) mainMapL.invalidateSize();
+    if (classMapL) classMapL.invalidateSize();
+  }, 100);
 }
 window.showProfileSetup = showProfileSetup;
 window.closeProfileSetup = closeProfileSetup;
@@ -2098,9 +2101,32 @@ function adminDirectEntry() {
   toast('🔓 관리자 모드로 입장했어요');
   renderClassView();
   updateAdminUI();
+  setTimeout(() => {
+    if (formMapL) formMapL.invalidateSize();
+    if (mainMapL) mainMapL.invalidateSize();
+    if (classMapL) classMapL.invalidateSize();
+  }, 100);
 }
 window.toggleAdminEntry = toggleAdminEntry;
 window.adminDirectEntry = adminDirectEntry;
+
+function logoutToProfile() {
+  // 관리자 모드 해제
+  if (adminMode) {
+    adminMode = false;
+    const appEl = document.getElementById('app');
+    if (appEl) appEl.classList.remove('admin-active');
+    const adminBtn = document.getElementById('adminBtn');
+    if (adminBtn) adminBtn.textContent = '🔒';
+    const csvBtn = document.getElementById('csvBtn');
+    if (csvBtn) csvBtn.style.display = 'none';
+  }
+  // 학생 정보 초기화 (다음 입력 위해)
+  try { localStorage.removeItem(STUDENT_KEY); } catch(e) {}
+  // 로그인 화면으로 이동
+  showProfileSetup(false);
+}
+window.logoutToProfile = logoutToProfile;
 
 /* ──── Edit Permission ──── */
 function canEditRecord(obs) {
