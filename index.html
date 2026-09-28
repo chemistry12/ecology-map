@@ -1223,58 +1223,69 @@ body.map-fs-active #mainMapContainer {
 
 <!-- Edit Modal -->
 <div class="modal-bg" id="editModalBg">
-  <div class="modal" id="editModal" style="max-width:440px;">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
-      <span style="font-size:22px;">✏️</span>
-      <span style="font-size:17px;font-weight:800;color:var(--txt);">기록 수정</span>
-    </div>
+  <div class="modal" id="editModal" style="max-width:440px;padding:0;overflow:hidden;">
 
-    <!-- 반/모둠 (관리자 전용) -->
-    <div id="editClassRow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <div class="edit-field-wrap">
-        <label class="edit-field-label">반</label>
-        <select class="inp edit-field-inp" id="editClassSel"></select>
+    <!-- 상단 정보 요약 (모아보기 스타일) -->
+    <div id="editInfoBanner" style="background:var(--grad);padding:16px 20px;display:flex;align-items:center;gap:12px;">
+      <img id="editBannerPhoto" style="width:56px;height:56px;border-radius:12px;object-fit:contain;background:rgba(255,255,255,.2);flex-shrink:0;display:none;" alt="">
+      <div id="editBannerNoPhoto" style="width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,.2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:26px;">🌿</div>
+      <div style="flex:1;min-width:0;">
+        <div id="editBannerSpecies" style="font-size:17px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        <div id="editBannerMeta" style="font-size:12px;color:rgba(255,255,255,.82);margin-top:3px;"></div>
       </div>
-      <div class="edit-field-wrap">
-        <label class="edit-field-label">모둠</label>
-        <select class="inp edit-field-inp" id="editGroupSel"></select>
+      <button onclick="document.getElementById('editModalBg').classList.remove('open')" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
+
+    <!-- 수정 폼 -->
+    <div style="padding:16px 20px 20px;overflow-y:auto;max-height:calc(80vh - 90px);">
+
+      <!-- 반/모둠 (관리자 전용) -->
+      <div id="editClassRow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div class="edit-field-wrap">
+          <label class="edit-field-label">반</label>
+          <select class="inp edit-field-inp" id="editClassSel"></select>
+        </div>
+        <div class="edit-field-wrap">
+          <label class="edit-field-label">모둠</label>
+          <select class="inp edit-field-inp" id="editGroupSel"></select>
+        </div>
       </div>
-    </div>
 
-    <!-- 학번/이름 (관리자 전용) -->
-    <div id="editStudentRow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <div class="edit-field-wrap">
-        <label class="edit-field-label">학번</label>
-        <input class="inp edit-field-inp" id="editStudentId" type="text" placeholder="예) 10101" inputmode="numeric">
+      <!-- 학번/이름 (관리자 전용) -->
+      <div id="editStudentRow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div class="edit-field-wrap">
+          <label class="edit-field-label">학번</label>
+          <input class="inp edit-field-inp" id="editStudentId" type="text" placeholder="예) 10101" inputmode="numeric">
+        </div>
+        <div class="edit-field-wrap">
+          <label class="edit-field-label">이름</label>
+          <input class="inp edit-field-inp" id="editNameInp" type="text" placeholder="이름">
+        </div>
       </div>
-      <div class="edit-field-wrap">
-        <label class="edit-field-label">이름</label>
-        <input class="inp edit-field-inp" id="editNameInp" type="text" placeholder="이름">
+
+      <!-- 생물 이름 -->
+      <div class="edit-field-wrap" style="margin-bottom:10px;">
+        <label class="edit-field-label">생물 이름</label>
+        <input class="inp edit-field-inp" id="editSpecies" type="text" placeholder="예) 민들레, 참새, 무당벌레">
       </div>
-    </div>
 
-    <!-- 생물 이름 -->
-    <div class="edit-field-wrap" style="margin-bottom:8px;">
-      <label class="edit-field-label">생물 이름</label>
-      <input class="inp edit-field-inp" id="editSpecies" type="text" placeholder="예) 민들레, 참새, 무당벌레">
-    </div>
+      <!-- 관찰 위치 -->
+      <div class="edit-field-wrap" style="margin-bottom:10px;">
+        <label class="edit-field-label">관찰 위치</label>
+        <select class="inp edit-field-inp" id="editLocation"></select>
+      </div>
 
-    <!-- 메모 -->
-    <div class="edit-field-wrap" style="margin-bottom:8px;">
-      <label class="edit-field-label">메모 <span style="font-weight:400;color:var(--txt2);">(생태 특성, 관찰 내용)</span></label>
-      <textarea class="inp edit-field-inp" id="editNotes" placeholder="예) 잎이 넓고 꽃이 노란색, 낙엽층 아래에서 발견…" rows="4"
-        style="resize:vertical;line-height:1.6;"></textarea>
-    </div>
+      <!-- 메모 (강조) -->
+      <div class="edit-field-wrap" style="margin-bottom:16px;">
+        <label class="edit-field-label" style="font-size:13px;color:var(--pri-d);font-weight:700;">📝 메모 <span style="font-weight:400;color:var(--txt2);font-size:11px;">(생태 특성, 관찰 내용)</span></label>
+        <textarea class="inp edit-field-inp" id="editNotes" placeholder="잎 모양, 색깔, 발견 상황 등 자유롭게 기록하세요…" rows="5"
+          style="resize:none;line-height:1.7;font-size:14px;border-color:var(--pri-m);"></textarea>
+      </div>
 
-    <!-- 위치 -->
-    <div class="edit-field-wrap" style="margin-bottom:16px;">
-      <label class="edit-field-label">관찰 위치</label>
-      <select class="inp edit-field-inp" id="editLocation"></select>
-    </div>
-
-    <div style="display:flex;gap:8px;">
-      <button class="btn-sec" id="editCancel" style="flex:1;padding:13px;">취소</button>
-      <button class="btn-pri" id="editSave" style="flex:2;padding:13px;">저장하기</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-sec" id="editCancel" style="flex:1;padding:13px;">취소</button>
+        <button class="btn-pri" id="editSave" style="flex:2;padding:13px;font-size:15px;">✅ 저장하기</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1653,6 +1664,7 @@ function initFormMap() {
     setFormPin(e.latlng.lat, e.latlng.lng);
     autoSelectZone(e.latlng.lat, e.latlng.lng);
   });
+  formMapL.on('zoomend', () => formMapL.invalidateSize());
 }
 
 /* ──── Map Gesture Handling ──── */
@@ -1693,8 +1705,8 @@ let satelliteMode = false;
 // OpenStreetMap — API 키 불필요, maxNativeZoom:19 설정으로 회색 화면 방지
 const OSM_URL  = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const SAT_URL  = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const OSM_OPTS = { maxZoom: 21, maxNativeZoom: 19 };
-const SAT_OPTS = { maxZoom: 21, maxNativeZoom: 17 };
+const OSM_OPTS = { maxZoom: 21, maxNativeZoom: 19, updateWhenZooming: false, keepBuffer: 4 };
+const SAT_OPTS = { maxZoom: 21, maxNativeZoom: 17, updateWhenZooming: false, keepBuffer: 4 };
 
 let baseLayers = {}; // mapId → L.tileLayer
 
@@ -1733,6 +1745,7 @@ function initMainMap() {
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
   const layer = L.tileLayer(OSM_URL, OSM_OPTS).addTo(mainMapL);
   baseLayers['main'] = layer;
+  mainMapL.on('zoomend', () => mainMapL.invalidateSize());
   addSatBtn(document.getElementById('mainMapContainer'));
   setupMapGesture(document.getElementById('mainMapContainer'), mainMapL);
 }
@@ -1743,6 +1756,7 @@ function initClassMap() {
     .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
   const layer = L.tileLayer(OSM_URL, OSM_OPTS).addTo(classMapL);
   baseLayers['class'] = layer;
+  classMapL.on('zoomend', () => classMapL.invalidateSize());
   addSatBtn(document.getElementById('classMapContainer'));
   setupMapGesture(document.getElementById('classMapContainer'), classMapL);
 }
@@ -3061,6 +3075,27 @@ function openEditModal(id) {
   if (!canEditRecord(obs)) {
     toast('✏️ 자신의 기록만 수정할 수 있어요 (학번+이름 불일치)');
     return;
+  }
+
+  // 배너 정보 채우기
+  const zone = ZONES.find(z => z.id === obs.location);
+  const bannerPhoto = document.getElementById('editBannerPhoto');
+  const bannerNoPhoto = document.getElementById('editBannerNoPhoto');
+  if (obs.photo) {
+    bannerPhoto.src = obs.photo;
+    bannerPhoto.style.display = '';
+    bannerNoPhoto.style.display = 'none';
+  } else {
+    bannerPhoto.style.display = 'none';
+    bannerNoPhoto.textContent = zone ? zone.em : '🌿';
+    bannerNoPhoto.style.display = 'flex';
+  }
+  const speciesEl = document.getElementById('editBannerSpecies');
+  if (speciesEl) speciesEl.textContent = obs.species || '(이름 없음)';
+  const metaEl = document.getElementById('editBannerMeta');
+  if (metaEl) {
+    const parts = [obs.class, obs.group, obs.name ? (obs.studentId ? obs.studentId+' '+obs.name : obs.name) : ''].filter(Boolean);
+    metaEl.textContent = parts.join(' · ');
   }
 
   // 관리자가 아닌 학생은 반/조/학번/이름 필드 숨김
