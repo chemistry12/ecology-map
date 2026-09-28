@@ -275,25 +275,39 @@ textarea.inp { height: 80px; resize: none; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 /* Photo Upload */
+.photo-row {
+  display: flex; gap: 10px; align-items: stretch;
+}
 .photo-area {
   border: 2px dashed var(--bdr); border-radius: var(--r);
-  background: var(--surf2); min-height: 130px;
+  background: var(--surf2);
+  flex: 1; aspect-ratio: 4/3;
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 8px; cursor: pointer;
   transition: border-color .2s; position: relative; overflow: hidden;
+  min-width: 0;
 }
 .photo-area:active { border-color: var(--pri); }
-.photo-area img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+.photo-area img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 10px; background: var(--bg); }
 .photo-area .photo-hint { font-size: 13px; color: var(--txt2); text-align: center; z-index: 1; }
 .photo-area .photo-icon { font-size: 32px; z-index: 1; }
-.photo-overlay {
-  position: absolute; inset: 0; background: rgba(0,0,0,.4);
-  display: flex; align-items: center; justify-content: center; gap: 10px; z-index: 2;
+/* 교체/삭제 버튼 사이드 패널 */
+.photo-side-btns {
+  display: flex; flex-direction: column; gap: 8px; justify-content: center;
+  flex-shrink: 0; width: 60px;
 }
-.photo-overlay button {
-  background: rgba(255,255,255,.9); border-radius: 8px; padding: 8px 12px;
-  font-size: 13px; font-weight: 600;
+.photo-side-btns button {
+  flex: 1; border-radius: 12px; font-size: 12px; font-weight: 700;
+  line-height: 1.4; padding: 8px 4px; cursor: pointer;
+  border: 1.5px solid var(--bdr); background: var(--surf);
+  color: var(--txt); transition: background .15s;
 }
+.photo-side-btns button:last-child {
+  background: #FFF0EE; color: var(--danger); border-color: #FBCACA;
+}
+.photo-side-btns button:active { opacity: .75; }
+/* 기존 overlay는 숨김 (사이드 버튼으로 대체) */
+.photo-overlay { display: none !important; }
 
 /* Zone Chips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1035,9 +1049,15 @@ body.map-fs-active #mainMapContainer {
               </a>
             </div>
           </div>
-          <div class="photo-area" id="photoArea" onclick="document.getElementById('photoInput').click()">
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">탭하여 사진 촬영 또는 선택</div>
+          <div class="photo-row">
+            <div class="photo-area" id="photoArea" onclick="document.getElementById('photoInput').click()">
+              <div class="photo-icon">📷</div>
+              <div class="photo-hint">탭하여 사진 촬영 또는 선택</div>
+            </div>
+            <div class="photo-side-btns" id="photoSideBtns" style="display:none;">
+              <button type="button" onclick="document.getElementById('photoInput').click()">📷<br>교체</button>
+              <button type="button" onclick="clearPhoto()">✕<br>삭제</button>
+            </div>
           </div>
           <input type="file" id="photoInput" accept="image/*" style="display:none">
         </div>
@@ -1876,15 +1896,15 @@ function renderPhotoArea() {
   if (!area) return;
   if (photoData) {
     area.innerHTML = `
-      <img src="${photoData}" alt="업로드 사진" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px;">
-      <div class="photo-overlay">
-        <button onclick="event.stopPropagation();document.getElementById('photoInput').click()">📷 교체</button>
-        <button onclick="event.stopPropagation();clearPhoto()">✕ 삭제</button>
-      </div>`;
+      <img src="${photoData}" alt="업로드 사진" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:10px;background:var(--bg);">`;
+    const sideBtns = document.getElementById('photoSideBtns');
+    if (sideBtns) sideBtns.style.display = 'flex';
     area.onclick = null;
   } else {
     area.innerHTML = `<div class="photo-icon">📷</div><div class="photo-hint">탭하여 사진 촬영 또는 선택</div>`;
     area.onclick = () => document.getElementById('photoInput').click();
+    const sideBtns = document.getElementById('photoSideBtns');
+    if (sideBtns) sideBtns.style.display = 'none';
   }
 }
 
