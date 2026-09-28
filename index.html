@@ -130,33 +130,46 @@ img { max-width: 100%; }
   padding: 12px 14px; font-size: 13px; color: #7A5000; margin-top: 16px;
 }
 
-/* ── Profile Setup Overlay ── */
+/* ── Profile Login Screen ── */
 #profileSetup {
-  position: fixed; inset: 0; background: var(--bg);
+  position: fixed; inset: 0;
+  background: var(--grad);
   display: flex; flex-direction: column; align-items: center;
-  justify-content: center; z-index: 9990;
-  padding: 24px 20px 48px; overflow-y: auto;
+  justify-content: center;
+  padding: 24px 20px calc(48px + env(safe-area-inset-bottom,0px)); overflow-y: auto;
 }
 #profileSetup.hidden { display: none; }
 .profile-card {
-  width: 100%; max-width: 380px;
-  background: var(--surf); border-radius: 20px;
-  padding: 28px 24px; box-shadow: var(--shadow);
+  width: 100%; max-width: 360px;
+  background: var(--surf); border-radius: 24px;
+  box-shadow: 0 8px 48px rgba(0,0,0,.22);
+  overflow: hidden;
 }
-.profile-logo { text-align: center; font-size: 40px; margin-bottom: 8px; }
-.profile-title { text-align: center; font-size: 21px; font-weight: 800; color: var(--txt); margin-bottom: 4px; }
-.profile-subtitle { text-align: center; font-size: 13px; color: var(--txt2); margin-bottom: 24px; }
-.profile-fld { margin-bottom: 14px; }
-.profile-fld > label { font-size: 11px; font-weight: 700; color: var(--txt2); display: block; margin-bottom: 4px; letter-spacing: .04em; text-transform: uppercase; }
+.profile-header {
+  background: var(--grad); padding: 36px 24px 28px; text-align: center;
+}
+.profile-logo { font-size: 48px; margin-bottom: 10px; }
+.profile-title { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 4px;
+  font-family: 'Nunito', 'Noto Sans KR', sans-serif; }
+.profile-subtitle { font-size: 13px; color: rgba(255,255,255,.82); }
+.profile-body { padding: 24px 24px 28px; }
+.profile-fld { margin-bottom: 16px; }
+.profile-fld > label {
+  font-size: 11px; font-weight: 700; color: var(--txt2);
+  display: block; margin-bottom: 5px; letter-spacing: .05em; text-transform: uppercase;
+}
 .profile-row2 { display: flex; gap: 10px; }
 .profile-row2 .profile-fld { flex: 1; min-width: 0; }
 .profile-start-btn {
-  width: 100%; padding: 14px; margin-top: 8px;
+  width: 100%; padding: 15px; margin-top: 4px;
   background: var(--grad); color: #fff; border: none;
   border-radius: 14px; font-size: 16px; font-weight: 800; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(44,160,90,.30);
+  transition: opacity .15s;
 }
+.profile-start-btn:active { opacity: .85; }
 .profile-cancel-btn {
-  width: 100%; padding: 10px; margin-top: 8px;
+  width: 100%; padding: 11px; margin-top: 10px;
   background: transparent; color: var(--txt2); border: 1.5px solid var(--bdr);
   border-radius: 14px; font-size: 14px; font-weight: 600; cursor: pointer;
 }
@@ -882,44 +895,50 @@ body.map-fs-active #mainMapContainer {
   </div>
 </div>
 
-<!-- ══════════════════════ PROFILE SETUP ══════════════════════ -->
-<div id="profileSetup" class="hidden">
+<!-- ══════════════════════ PROFILE SETUP (로그인 화면) ══════════════════════ -->
+<div id="profileSetup">
   <div class="profile-card">
-    <div class="profile-logo">🌿</div>
-    <div class="profile-title">영생고 생태지도</div>
-    <div class="profile-subtitle">시작 전에 내 정보를 입력해요</div>
+    <!-- 헤더 -->
+    <div class="profile-header">
+      <div class="profile-logo">🌿</div>
+      <div class="profile-title">영생고 생태지도</div>
+      <div class="profile-subtitle">내 정보를 입력하고 시작하세요</div>
+    </div>
 
-    <div class="profile-row2">
-      <div class="profile-fld">
-        <label>학년·반</label>
-        <select class="inp" id="profileClass">
-          <option value="">선택</option>
-        </select>
+    <!-- 입력 바디 -->
+    <div class="profile-body">
+      <div class="profile-row2">
+        <div class="profile-fld">
+          <label>학년·반</label>
+          <select class="inp" id="profileClass">
+            <option value="">선택</option>
+          </select>
+        </div>
+        <div class="profile-fld">
+          <label>조</label>
+          <select class="inp" id="profileGroup">
+            <option value="">선택</option>
+            <option>1조</option><option>2조</option><option>3조</option>
+            <option>4조</option><option>5조</option><option>6조</option>
+          </select>
+        </div>
       </div>
+
       <div class="profile-fld">
-        <label>조</label>
-        <select class="inp" id="profileGroup">
-          <option value="">선택</option>
-          <option>1조</option><option>2조</option><option>3조</option>
-          <option>4조</option><option>5조</option><option>6조</option>
-        </select>
+        <label>학번</label>
+        <input class="inp" id="profileStudentId" type="text" placeholder="예: 10101" inputmode="numeric" autocomplete="off">
       </div>
+
+      <div class="profile-fld">
+        <label>이름</label>
+        <input class="inp" id="profileName" type="text" placeholder="홍길동" autocomplete="off">
+      </div>
+
+      <div id="profileError" style="display:none;font-size:13px;color:var(--danger);margin-top:-4px;margin-bottom:8px;"></div>
+
+      <button class="profile-start-btn" onclick="saveProfileAndStart()">시작하기 🌱</button>
+      <button class="profile-cancel-btn hidden" id="profileCancelBtn" onclick="closeProfileSetup()">← 돌아가기</button>
     </div>
-
-    <div class="profile-fld">
-      <label>학번</label>
-      <input class="inp" id="profileStudentId" type="text" placeholder="예: 10101" inputmode="numeric" autocomplete="off">
-    </div>
-
-    <div class="profile-fld">
-      <label>이름</label>
-      <input class="inp" id="profileName" type="text" placeholder="홍길동" autocomplete="off">
-    </div>
-
-    <div id="profileError" style="display:none;font-size:13px;color:var(--danger);margin-top:4px;margin-bottom:-4px;"></div>
-
-    <button class="profile-start-btn" onclick="saveProfileAndStart()">시작하기 🌱</button>
-    <button class="profile-cancel-btn hidden" id="profileCancelBtn" onclick="closeProfileSetup()">취소</button>
   </div>
 </div>
 
@@ -1304,14 +1323,18 @@ let currentGroupFilter = 'all';
 window.addEventListener('DOMContentLoaded', () => {
   if (!GAS_URL || GAS_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
     document.getElementById('setup').style.display = 'flex';
+    document.getElementById('profileSetup').style.display = 'none';
     document.getElementById('app').style.display = 'none';
     return;
   }
+  // 항상 로그인 화면 먼저 표시
   document.getElementById('setup').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  // profileSetup은 기본으로 보임 (hidden 클래스 없음)
+  buildProfileClassSelect();
+  prefillProfileFromStorage();
+  // 백그라운드에서 앱 초기화 (Firebase, 지도 등 미리 준비)
   initApp();
-  // 항상 프로필 입력 화면 표시 (이전 데이터는 폼에 미리 채워짐)
-  showProfileSetup(false);
 });
 
 function initApp() {
@@ -1930,46 +1953,52 @@ function clearStudentInfo() {
   document.getElementById('inpName').value = '';
   const hint = document.getElementById('sidHint');
   if (hint) hint.textContent = '';
-  showProfileSetup(false);
+  showProfileSetup(false); // 로그인 화면으로 돌아가기
 }
 window.clearStudentInfo = clearStudentInfo;
 
-/* ──── Profile Setup Overlay ──── */
-function showProfileSetup(canClose) {
+/* ──── Profile Login Screen ──── */
+function prefillProfileFromStorage() {
+  buildProfileClassSelect();
+  const info = loadStudentInfo();
+  if (!info) return;
+  const pc = document.getElementById('profileClass');
+  const pg = document.getElementById('profileGroup');
+  const ps = document.getElementById('profileStudentId');
+  const pn = document.getElementById('profileName');
+  if (pc && info.cls) pc.value = info.cls;
+  if (pg && info.grp) pg.value = info.grp;
+  if (ps && info.sid) ps.value = info.sid;
+  if (pn && info.name) pn.value = info.name;
+}
+
+function showProfileSetup(fromApp) {
+  // fromApp=true이면 취소 버튼 표시 (앱 안에서 변경 누른 경우)
   const overlay = document.getElementById('profileSetup');
   const cancelBtn = document.getElementById('profileCancelBtn');
   if (!overlay) return;
 
-  // 기존 프로필 있으면 미리 채우기
-  const info = loadStudentInfo();
-  if (info) {
-    const pc = document.getElementById('profileClass');
-    const pg = document.getElementById('profileGroup');
-    const ps = document.getElementById('profileStudentId');
-    const pn = document.getElementById('profileName');
-    if (pc && info.cls) pc.value = info.cls;
-    if (pg && info.grp) pg.value = info.grp;
-    if (ps && info.sid) ps.value = info.sid;
-    if (pn && info.name) pn.value = info.name;
-  }
-
-  // profileClass 옵션 채우기 (buildClassSelect 이후)
-  buildProfileClassSelect();
+  prefillProfileFromStorage();
 
   if (cancelBtn) {
-    if (canClose) cancelBtn.classList.remove('hidden');
+    if (fromApp) cancelBtn.classList.remove('hidden');
     else cancelBtn.classList.add('hidden');
   }
 
   const err = document.getElementById('profileError');
   if (err) err.style.display = 'none';
 
+  // 앱 숨기고 로그인 화면 표시
+  document.getElementById('app').style.display = 'none';
+  overlay.style.display = 'flex';
   overlay.classList.remove('hidden');
 }
 
 function closeProfileSetup() {
+  // 취소: 로그인 화면 숨기고 앱으로 복귀
   const overlay = document.getElementById('profileSetup');
-  if (overlay) overlay.classList.add('hidden');
+  if (overlay) { overlay.style.display = 'none'; overlay.classList.add('hidden'); }
+  document.getElementById('app').style.display = 'flex';
 }
 
 function buildProfileClassSelect() {
@@ -2005,7 +2034,10 @@ function saveProfileAndStart() {
   if (sidErr) { showErr(sidErr); return; }
 
   saveStudentInfo(cls, grp, sid, name);
-  closeProfileSetup();
+  // 로그인 화면 숨기고 앱으로 진입
+  const overlay = document.getElementById('profileSetup');
+  if (overlay) { overlay.style.display = 'none'; overlay.classList.add('hidden'); }
+  document.getElementById('app').style.display = 'flex';
   applyStudentInfo();
   toast('✅ 정보가 저장됐어요!');
 }
