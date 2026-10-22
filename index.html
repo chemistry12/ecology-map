@@ -1121,6 +1121,7 @@ body.map-fs-active #mainMapContainer {
 
         <div id="formError" style="display:none;background:#FEE;color:#C00;border:1px solid #FBCACA;border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;margin-bottom:10px;text-align:center;"></div>
         <button class="submit-btn" id="submitBtn">📍 기록 저장하기</button>
+        <button id="formDeleteBtn" hidden onclick="deleteFromForm()" style="width:100%;margin-top:10px;padding:13px;border-radius:var(--r);border:1.5px solid #E57373;background:transparent;color:#C62828;font-size:15px;font-weight:700;cursor:pointer;">🗑️ 이 기록 삭제하기</button>
         <div style="height:20px;"></div>
       </div>
     </div>
@@ -2376,6 +2377,8 @@ function resetForm() {
   if (banner) banner.hidden = true;
   const submitBtn = document.getElementById('submitBtn');
   if (submitBtn) submitBtn.innerHTML = '📍 기록 저장하기';
+  const formDeleteBtn = document.getElementById('formDeleteBtn');
+  if (formDeleteBtn) formDeleteBtn.hidden = true;
 
   // 학생 정보는 고정 — 저장된 값으로 복원 (없으면 초기화)
   const info = loadStudentInfo();
@@ -2475,9 +2478,11 @@ function openEditInForm(id) {
   if (banner) banner.hidden = false;
   if (bannerMeta) bannerMeta.textContent = `${obs.species} · ${obs.location} · ${obs.name}`;
 
-  // 6. 제출 버튼 텍스트 변경
+  // 6. 제출 버튼 텍스트 변경 + 삭제 버튼 표시
   const submitBtn = document.getElementById('submitBtn');
   if (submitBtn) submitBtn.innerHTML = '✅ 수정 저장하기';
+  const formDeleteBtn = document.getElementById('formDeleteBtn');
+  if (formDeleteBtn) formDeleteBtn.hidden = false;
 
   // 7. 기록하기 탭으로 전환 + 스크롤 상단
   switchTab('tab-record');
@@ -2488,6 +2493,25 @@ function cancelEditMode() {
   resetForm();
   // 폼 초기화만 하고 탭은 그대로 (tab-record)
   // 이미 resetForm이 banner 숨기고 editModeId 초기화함
+}
+
+async function deleteFromForm() {
+  if (!editModeId) return;
+  const obs = observations[editModeId];
+  if (!obs) return;
+  if (!adminMode && !canEditRecord(obs)) { toast('🔒 자신의 기록만 삭제할 수 있어요'); return; }
+  if (!confirm(`"${obs.species}" 기록을 삭제할까요?`)) return;
+  const idToDelete = editModeId;
+  resetForm(); // 먼저 폼 초기화
+  switchTab('tab-mine');
+  try {
+    await gasAPI('delete', { id: idToDelete });
+    delete observations[idToDelete];
+    onData();
+    toast('🗑️ 삭제 완료');
+  } catch(err) {
+    toast('❌ 삭제 실패: ' + err.message);
+  }
 }
 
 /* ──── Map Fullscreen Toggle ──── */
@@ -3020,6 +3044,18 @@ window.modalNav = modalNav;
 
 /* ──── Tab Navigation ──── */
 function switchTab(tabId) {
+  // 수정 모드에서 다른 탭으로 이동하면 수정 모드 취소
+  if (tabId !== 'tab-record' && editModeId) {
+    editModeId = null;
+    editModeOriginalPhoto = null;
+    const banner = document.getElementById('editModeBanner');
+    if (banner) banner.hidden = true;
+    const formDeleteBtn = document.getElementById('formDeleteBtn');
+    if (formDeleteBtn) formDeleteBtn.hidden = true;
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) submitBtn.innerHTML = '📍 기록 저장하기';
+  }
+
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(tabId).classList.add('active');
@@ -3767,6 +3803,7 @@ window.clearPhoto = clearPhoto;
 window.openEditModal = openEditModal;
 window.openEditInForm = openEditInForm;
 window.cancelEditMode = cancelEditMode;
+window.deleteFromForm = deleteFromForm;
 window.resetFormMapToSchool = resetFormMapToSchool;
 window.confirmDelete = confirmDelete;
 
