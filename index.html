@@ -1074,6 +1074,7 @@ body.map-fs-active #mainMapContainer {
               <button type="button" onclick="clearPhoto()">✕<br>삭제</button>
             </div>
           </div>
+          <div id="photoGpsHint" style="font-size:12px;color:var(--pri);margin-top:5px;text-align:center;opacity:.75;">📍 사진을 찍으면 GPS 위치가 자동으로 설정돼요</div>
           <input type="file" id="photoInput" accept="image/*" style="display:none">
         </div>
 
@@ -1092,7 +1093,7 @@ body.map-fs-active #mainMapContainer {
         <!-- 메모 -->
         <div class="form-section">
           <label>메모 <span style="font-weight:400;color:var(--txt2)">(선택)</span></label>
-          <textarea class="inp" id="inpNotes" placeholder="발견 상황, 특이사항 등"></textarea>
+          <textarea class="inp" id="inpNotes" placeholder="예) 운동장 화단 근처에서 발견. 꽃이 피어 있었음. 3마리 정도 있었음."></textarea>
         </div>
 
         <!-- 발견 장소 — 지도 핀 -->
@@ -1190,7 +1191,8 @@ body.map-fs-active #mainMapContainer {
     <div class="success-meta" id="successMetaText"></div>
     <div class="success-total" id="successTotalText"></div>
     <button class="success-next" onclick="closeSuccess()">다음 생물 기록하기 →</button>
-    <button class="success-view" onclick="closeSuccess();switchTab('tab-class')">🗺️ 모아보기에서 확인</button>
+    <button class="success-view" onclick="closeSuccess();switchTab('tab-mine')">📋 내 기록 확인하기</button>
+    <button class="success-view" style="margin-top:6px;background:transparent;color:var(--txt2);border:1.5px solid var(--bdr);font-size:13px;" onclick="closeSuccess();switchTab('tab-class')">🗺️ 전체 모아보기</button>
   </div>
 </div>
 
@@ -1918,6 +1920,12 @@ document.addEventListener('DOMContentLoaded', () => {
   photoInput.addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // 로딩 표시
+    const area = document.getElementById('photoArea');
+    area.onclick = null;
+    area.innerHTML = `<div class="photo-icon" style="animation:spin 1s linear infinite;display:inline-block;">⏳</div><div class="photo-hint">사진 처리 중…</div>`;
+
     // Try EXIF GPS
     const gps = await readExifGPS(file);
     if (gps && formMapL) {
@@ -1931,6 +1939,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (photoData.length > 80000) photoData = await compressImg(file, 600, 0.65);
     if (photoData.length > 60000) photoData = await compressImg(file, 480, 0.60);
     renderPhotoArea();
+
+    // GPS 힌트 업데이트
+    const hint = document.getElementById('photoGpsHint');
+    if (hint) {
+      if (gps) {
+        hint.textContent = '✅ 사진 GPS로 지도 핀이 자동 설정됐어요!';
+        hint.style.opacity = '1';
+        hint.style.fontWeight = '600';
+      } else {
+        hint.textContent = '📍 사진을 찍으면 GPS 위치가 자동으로 설정돼요';
+        hint.style.opacity = '.75';
+        hint.style.fontWeight = '';
+      }
+    }
   });
 });
 
@@ -1956,6 +1978,12 @@ function clearPhoto() {
   photoData = null;
   document.getElementById('photoInput').value = '';
   renderPhotoArea();
+  const hint = document.getElementById('photoGpsHint');
+  if (hint) {
+    hint.textContent = '📍 사진을 찍으면 GPS 위치가 자동으로 설정돼요';
+    hint.style.opacity = '.75';
+    hint.style.fontWeight = '';
+  }
 }
 
 /* ──── Image Compression ──── */
@@ -2234,7 +2262,13 @@ async function handleSubmit() {
 
   function showErr(msg) {
     const el = document.getElementById('formError');
-    if (el) { el.textContent = msg; el.style.display = 'block'; setTimeout(()=>el.style.display='none', 4000); }
+    if (el) {
+      el.innerHTML = `${msg} <span onclick="this.parentElement.style.display='none'" style="float:right;cursor:pointer;opacity:.6;">✕</span>`;
+      el.style.display = 'block';
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.style.display = 'none', 7000);
+    }
     toast(msg);
   }
   const el2 = document.getElementById('formError');
@@ -2250,12 +2284,11 @@ async function handleSubmit() {
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
-  btn.textContent = '저장 중…';
+  btn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> 저장 중…';
 
   try {
     // 사진 → base64로 RTDB에 저장
     let photoUrl = photoData || null;
-    btn.textContent = '저장 중…';
 
     const data = {
       class:     cls,
@@ -2287,7 +2320,7 @@ async function handleSubmit() {
     toast('❌ 저장 실패: ' + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = '📍 기록 저장하기';
+    btn.innerHTML = '📍 기록 저장하기';
   }
 }
 
