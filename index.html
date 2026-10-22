@@ -1926,7 +1926,10 @@ document.addEventListener('DOMContentLoaded', () => {
       autoSelectZone(gps.lat, gps.lon);
       toast('📍 사진 GPS 위치로 핀 설정됨');
     }
-    photoData = await compressImg(file, 1200, 0.85);
+    photoData = await compressImg(file, 800, 0.75);
+    // 결과가 너무 크면 재압축 (Google Sheets 셀 한도 대비)
+    if (photoData.length > 80000) photoData = await compressImg(file, 600, 0.65);
+    if (photoData.length > 60000) photoData = await compressImg(file, 480, 0.60);
     renderPhotoArea();
   });
 });
