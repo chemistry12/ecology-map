@@ -1024,6 +1024,16 @@ body.map-fs-active #mainMapContainer {
           <button type="button" class="stu-change-btn" onclick="showProfileSetup(true)">✏️ 변경</button>
         </div>
 
+        <!-- 수정 모드 배너 (수정 중일 때만 표시) -->
+        <div id="editModeBanner" hidden style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border:1.5px solid #81C784;border-radius:14px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">✏️</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:800;color:#2E7D32;">기록 수정 중</div>
+            <div id="editModeBannerMeta" style="font-size:12px;color:#388E3C;margin-top:2px;"></div>
+          </div>
+          <button onclick="cancelEditMode()" style="background:#fff;border:1.5px solid #81C784;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;">✕ 취소</button>
+        </div>
+
         <!-- 학급 / 조 / 학번 / 이름 (숨김 - 로그인에서 이미 입력, 제출 로직용으로만 유지) -->
         <div id="formStudentFields" style="display:none">
           <div class="form-section">
@@ -1391,6 +1401,8 @@ let selectedZone = null;
 let pinLat = null, pinLng = null;
 let formMapL = null, mainMapL = null, classMapL = null;
 let formMarker = null;
+let editModeId = null;        // 수정 모드일 때 기록 ID
+let editModeOriginalPhoto = null; // 수정 모드 기존 사진 URL
 let obsMarkersMain = [], obsMarkersClass = [];
 let mainClusterLayer = null, classClusterLayer = null;
 let photoData = null;
@@ -1994,6 +2006,7 @@ function renderPhotoArea() {
 
 function clearPhoto() {
   photoData = null;
+  editModeOriginalPhoto = null; // 수정 모드에서 기존 사진도 삭제
   document.getElementById('photoInput').value = '';
   renderPhotoArea();
   const hint = document.getElementById('photoGpsHint');
@@ -2304,9 +2317,11 @@ async function handleSubmit() {
   btn.disabled = true;
   btn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> 저장 중…';
 
+  const wasEditMode = !!editModeId; // finally 블록에서 resetForm() 이후에도 참조 가능
+
   try {
-    // 사진 → base64로 RTDB에 저장
-    let photoUrl = photoData || null;
+    // 사진 결정: 새로 선택한 것 > 기존 원본 > null
+    const photoUrl = photoData || editModeOriginalPhoto || null;
 
     const data = {
       class:     cls,
@@ -2317,32 +2332,51 @@ async function handleSubmit() {
       location:  selectedZone || '기타',
       lat:       pinLat !== null ? pinLat : (ZONES.find(z => z.id === selectedZone)?.lat ?? SCHOOL_CENTER[0]),
       lng:       pinLng !== null ? pinLng : (ZONES.find(z => z.id === selectedZone)?.lng ?? SCHOOL_CENTER[1]),
-      photo:     photoUrl || null,
+      photo:     photoUrl,
       notes:     notes,
-      timestamp: Date.now(),
     };
-    const result = await gasAPI('add', { data });
-    // 로컬 캐시에 즉시 반영 (폴링 전까지 UI에 표시)
-    // photo는 Drive URL로 교체 (base64 대신)
-    if (result && result.id) {
-      observations[result.id] = { ...data, photo: result.photoUrl || data.photo };
-      onData();
+
+    if (editModeId) {
+      // ── 수정 모드 ──
+      await gasAPI('update', { id: editModeId, data });
+      if (observations[editModeId]) {
+        Object.assign(observations[editModeId], data);
+        onData();
+      }
+      toast('✅ 수정 완료!');
+      resetForm();
+      switchTab('tab-mine');
+    } else {
+      // ── 새 기록 모드 ──
+      data.timestamp = Date.now();
+      const result = await gasAPI('add', { data });
+      if (result && result.id) {
+        observations[result.id] = { ...data, photo: result.photoUrl || data.photo };
+        onData();
+      }
+      saveStudentInfo(cls, grp, sid, name);
+      applyStudentInfo();
+      const myTotal = sid ? Object.values(observations).filter(o => o.studentId === sid).length : 1;
+      resetForm();
+      showSuccess(sp, cls, grp, name, myTotal);
     }
-    saveStudentInfo(cls, grp, sid, name);
-    applyStudentInfo();
-    // 내 총 기록 수 계산
-    const myTotal = sid ? Object.values(observations).filter(o => o.studentId === sid).length : 1;
-    resetForm();
-    showSuccess(sp, cls, grp, name, myTotal);
   } catch(e) {
     toast('❌ 저장 실패: ' + e.message);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '📍 기록 저장하기';
+    btn.innerHTML = wasEditMode ? '✅ 수정 저장하기' : '📍 기록 저장하기';
   }
 }
 
 function resetForm() {
+  // 수정 모드 해제
+  editModeId = null;
+  editModeOriginalPhoto = null;
+  const banner = document.getElementById('editModeBanner');
+  if (banner) banner.hidden = true;
+  const submitBtn = document.getElementById('submitBtn');
+  if (submitBtn) submitBtn.innerHTML = '📍 기록 저장하기';
+
   // 학생 정보는 고정 — 저장된 값으로 복원 (없으면 초기화)
   const info = loadStudentInfo();
   if (info) {
@@ -2369,6 +2403,91 @@ function resetForm() {
   if (disp) disp.innerHTML = '';
   const tools = document.getElementById('formMapTools');
   if (tools) tools.style.display = 'none';
+}
+
+/* ──── 수정 모드: 기록 폼에서 열기 ──── */
+function openEditInForm(id) {
+  const obs = observations[id];
+  if (!obs) return;
+
+  // 1. 폼 초기화 후 수정 모드 세팅
+  resetForm(); // 깨끗하게 리셋
+  editModeId = id;
+  editModeOriginalPhoto = obs.photo || null;
+
+  // 2. 필드 채우기
+  const selClass = document.getElementById('selClass');
+  const selGroup = document.getElementById('selGroup');
+  if (selClass) selClass.value = obs.class || '';
+  if (selGroup) selGroup.value = obs.group || '';
+  document.getElementById('inpStudentId').value = obs.studentId || '';
+  document.getElementById('inpName').value = obs.name || '';
+  document.getElementById('inpSpecies').value = obs.species || '';
+  document.getElementById('inpNotes').value = obs.notes || '';
+
+  // 3. 사진 미리보기 — 기존 사진을 photoArea에 표시 (photoData는 null 유지)
+  if (obs.photo) {
+    photoData = null; // 새 사진 없음 → 저장 시 editModeOriginalPhoto 사용
+    const area = document.getElementById('photoArea');
+    const sideBtns = document.getElementById('photoSideBtns');
+    if (area) {
+      area.classList.add('has-photo');
+      area.innerHTML = `<img src="${obs.photo}" alt="기존 사진" style="opacity:.85;"><div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;color:#fff;background:rgba(0,0,0,.5);padding:3px 0;border-radius:0 0 var(--r) var(--r);">기존 사진 · 교체하려면 탭</div>`;
+      area.onclick = () => document.getElementById('photoInput').click();
+    }
+    if (sideBtns) sideBtns.style.display = 'flex';
+  }
+
+  // 4. 지도 핀 복원
+  if (obs.lat && obs.lng) {
+    pinLat = parseFloat(obs.lat);
+    pinLng = parseFloat(obs.lng);
+    selectedZone = obs.location || null;
+    // 지도 핀 찍기 (formMapL이 초기화돼 있으면)
+    if (formMapL) {
+      setTimeout(() => {
+        formMapL.invalidateSize();
+        formMapL.setView([pinLat, pinLng], 18);
+        if (formMarker) formMapL.removeLayer(formMarker);
+        formMarker = L.marker([pinLat, pinLng], {
+          icon: L.divIcon({ className: '', html: '<div style="font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));">📍</div>', iconSize: [32, 32], iconAnchor: [16, 32] })
+        }).addTo(formMapL);
+        const tools = document.getElementById('formMapTools');
+        if (tools) tools.style.display = 'flex';
+        // 구역 표시 업데이트
+        const disp = document.getElementById('autoZoneDisplay');
+        if (disp && selectedZone) {
+          const z = ZONES.find(z => z.id === selectedZone);
+          disp.innerHTML = `<span style="color:var(--pri);font-weight:700;">${z ? z.em + ' ' + z.label : selectedZone}</span> 위치가 설정됐어요`;
+        }
+      }, 200);
+    }
+  } else if (obs.location) {
+    selectedZone = obs.location;
+    const z = ZONES.find(z => z.id === obs.location);
+    const disp = document.getElementById('autoZoneDisplay');
+    if (disp && z) disp.innerHTML = `<span style="color:var(--pri);font-weight:700;">${z.em} ${z.label}</span> 위치가 설정됐어요`;
+  }
+
+  // 5. 수정 배너 표시
+  const banner = document.getElementById('editModeBanner');
+  const bannerMeta = document.getElementById('editModeBannerMeta');
+  if (banner) banner.hidden = false;
+  if (bannerMeta) bannerMeta.textContent = `${obs.species} · ${obs.location} · ${obs.name}`;
+
+  // 6. 제출 버튼 텍스트 변경
+  const submitBtn = document.getElementById('submitBtn');
+  if (submitBtn) submitBtn.innerHTML = '✅ 수정 저장하기';
+
+  // 7. 기록하기 탭으로 전환 + 스크롤 상단
+  switchTab('tab-record');
+  setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+}
+
+function cancelEditMode() {
+  resetForm();
+  // 폼 초기화만 하고 탭은 그대로 (tab-record)
+  // 이미 resetForm이 banner 숨기고 editModeId 초기화함
 }
 
 /* ──── Map Fullscreen Toggle ──── */
@@ -3471,7 +3590,7 @@ function makeMineObsCard(id, obs, isAdmin) {
           white-space:nowrap;
         `;
         memoBtn.textContent = '📝 메모 추가';
-        memoBtn.onclick = (e) => { e.stopPropagation(); openEditModal(id); };
+        memoBtn.onclick = (e) => { e.stopPropagation(); openEditInForm(id); };
         card.style.position = 'relative';
         // body 하단 여백 확보
         card.querySelector('.obs-card-body').style.paddingBottom = '30px';
@@ -3480,15 +3599,15 @@ function makeMineObsCard(id, obs, isAdmin) {
         const eb = document.createElement('button');
         eb.style.cssText = 'flex-shrink:0;font-size:13px;font-weight:700;padding:5px 10px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--surf2);color:var(--txt2);cursor:pointer;';
         eb.textContent = '✏️';
-        eb.onclick = (e) => { e.stopPropagation(); openEditModal(id); };
+        eb.onclick = (e) => { e.stopPropagation(); openEditInForm(id); };
         card.appendChild(eb);
       }
     }
   }
-  // 카드 전체 탭 → 수정 모달 (잠기지 않은 학생 기록)
+  // 카드 전체 탭 → 수정 폼 (잠기지 않은 학생 기록)
   card.onclick = (e) => {
     if (e.target.tagName === 'BUTTON') return;
-    if (!isAdmin && !obs.locked) { openEditModal(id); return; }
+    if (!isAdmin && !obs.locked) { openEditInForm(id); return; }
     openModal(id, obs);
   };
   return card;
@@ -3646,6 +3765,8 @@ function bindUI() {
 window.deleteObs = deleteObs;
 window.clearPhoto = clearPhoto;
 window.openEditModal = openEditModal;
+window.openEditInForm = openEditInForm;
+window.cancelEditMode = cancelEditMode;
 window.resetFormMapToSchool = resetFormMapToSchool;
 window.confirmDelete = confirmDelete;
 
