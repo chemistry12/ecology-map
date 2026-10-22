@@ -10,6 +10,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 /* ───── Design Tokens ───── */
+/* hidden 속성이 inline style에 묻히지 않도록 강제 */
+[hidden] { display: none !important; }
+
 :root {
   --bg: #EEF7F1;
   --surf: #ffffff;
@@ -1810,19 +1813,10 @@ function setFormPin(lat, lng) {
 }
 
 function autoSelectZone(lat, lng) {
-  let minD = Infinity, nearest = null;
-  ZONES.forEach(z => {
-    const d = Math.hypot(z.lat - lat, z.lng - lng);
-    if (d < minD) { minD = d; nearest = z; }
-  });
+  // 구역 태그 표시 제거 — 핀 위치만 사용
+  selectedZone = null;
   const disp = document.getElementById('autoZoneDisplay');
-  if (nearest && minD < 0.0005) {
-    selectedZone = nearest.id;
-    if (disp) disp.innerHTML = `<span class="auto-zone-badge">${nearest.em} ${nearest.id} 근처</span>`;
-  } else {
-    selectedZone = null;
-    if (disp) disp.innerHTML = `<span class="auto-zone-badge" style="color:var(--txt2);">📍 핀 위치 저장됨</span>`;
-  }
+  if (disp) disp.innerHTML = `<span class="auto-zone-badge" style="color:var(--txt2);">📍 위치가 설정됐어요</span>`;
 }
 
 /* ──── Build Class Select ──── */
@@ -2457,26 +2451,21 @@ function openEditInForm(id) {
         }).addTo(formMapL);
         const tools = document.getElementById('formMapTools');
         if (tools) tools.style.display = 'flex';
-        // 구역 표시 업데이트
         const disp = document.getElementById('autoZoneDisplay');
-        if (disp && selectedZone) {
-          const z = ZONES.find(z => z.id === selectedZone);
-          disp.innerHTML = `<span style="color:var(--pri);font-weight:700;">${z ? z.em + ' ' + z.label : selectedZone}</span> 위치가 설정됐어요`;
-        }
+        if (disp) disp.innerHTML = `<span class="auto-zone-badge" style="color:var(--txt2);">📍 위치가 설정됐어요</span>`;
       }, 200);
     }
   } else if (obs.location) {
     selectedZone = obs.location;
-    const z = ZONES.find(z => z.id === obs.location);
     const disp = document.getElementById('autoZoneDisplay');
-    if (disp && z) disp.innerHTML = `<span style="color:var(--pri);font-weight:700;">${z.em} ${z.label}</span> 위치가 설정됐어요`;
+    if (disp) disp.innerHTML = `<span class="auto-zone-badge" style="color:var(--txt2);">📍 위치가 설정됐어요</span>`;
   }
 
   // 5. 수정 배너 표시
   const banner = document.getElementById('editModeBanner');
   const bannerMeta = document.getElementById('editModeBannerMeta');
   if (banner) banner.hidden = false;
-  if (bannerMeta) bannerMeta.textContent = `${obs.species} · ${obs.location} · ${obs.name}`;
+  if (bannerMeta) bannerMeta.textContent = `${obs.species} · ${obs.name}`;
 
   // 6. 제출 버튼 텍스트 변경 + 삭제 버튼 표시
   const submitBtn = document.getElementById('submitBtn');
@@ -2841,13 +2830,13 @@ function renderClassView() {
     const card = document.createElement('div');
     card.className = 'obs-card';
     const metaLine = isAll
-      ? `${obs.class} · ${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''} · ${obs.location}`
-      : `${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''} · ${obs.location}`;
+      ? `${obs.class} · ${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''}`
+      : `${obs.group}${obs.name ? ' · ' + (obs.studentId ? obs.studentId + ' ' : '') + obs.name : ''}`;
     const safeSpecies = (String(obs.species || '')).replace(/'/g, "\\'");
     card.innerHTML = `
       ${obs.photo
         ? `<img class="obs-card-img" src="${obs.photo}" alt="${obs.species}">`
-        : `<div class="obs-card-img-placeholder">${zone ? zone.em : '📍'}</div>`}
+        : `<div class="obs-card-img-placeholder">🌿</div>`}
       <div class="obs-card-body">
         <div class="obs-card-species">${obs.species}</div>
         <div class="obs-card-meta">${metaLine}</div>
@@ -2998,12 +2987,11 @@ function _renderModalContent(id, obs) {
   document.getElementById('modalContent').innerHTML = `
     ${obs.photo ? `<img class="modal-img" src="${obs.photo}" alt="${obs.species}" onclick="openLightbox(this.src)">` : ''}
     <div class="modal-body">
-      <div class="modal-species">${zone ? zone.em : '📍'} ${obs.species}</div>
+      <div class="modal-species">🌿 ${obs.species}</div>
       <div class="modal-row">
         <span class="modal-badge">📚 ${obs.class}</span>
         <span class="modal-badge">👥 ${obs.group}</span>
         ${obs.name ? `<span class="modal-badge">🙋 ${obs.studentId ? obs.studentId+' ' : ''}${obs.name}</span>` : ''}
-        <span class="modal-badge">📍 ${obs.location}</span>
       </div>
       ${obs.notes ? `<div class="modal-notes">${obs.notes}</div>` : ''}
       <div class="modal-time">${formatTime(obs.timestamp)}</div>
@@ -3585,12 +3573,12 @@ function makeMineObsCard(id, obs, isAdmin) {
   const card = document.createElement('div');
   card.className = 'obs-card';
   const metaLine = isAdmin
-    ? `${obs.class || ''} · ${obs.group} · ${obs.studentId ? obs.studentId + ' ' : ''}${obs.name || ''} · ${obs.location}`
-    : `${obs.group} · ${obs.location}`;
+    ? `${obs.class || ''} · ${obs.group} · ${obs.studentId ? obs.studentId + ' ' : ''}${obs.name || ''}`
+    : obs.group;
   card.innerHTML = `
     ${obs.photo
       ? `<img class="obs-card-img" src="${obs.photo}" alt="${obs.species}">`
-      : `<div class="obs-card-img-placeholder">${zone ? zone.em : '📍'}</div>`}
+      : `<div class="obs-card-img-placeholder">🌿</div>`}
     <div class="obs-card-body">
       <div class="obs-card-species">${obs.species}</div>
       <div class="obs-card-meta">${metaLine}</div>
