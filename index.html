@@ -546,6 +546,71 @@ body.map-fs-active #mainMapContainer {
   padding: 4px; flex-shrink: 0;
 }
 
+/* ───── 도움말 모달 ───── */
+.help-header {
+  background: var(--grad);
+  padding: 20px 20px 16px; color: #fff;
+}
+.help-header h2 { font-size: 18px; font-weight: 900; margin-bottom: 2px; }
+.help-header p { font-size: 12px; opacity: .85; }
+.help-body { padding: 16px; overflow-y: auto; flex: 1; }
+.help-step {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 10px 0; border-bottom: 1px solid var(--bdr);
+}
+.help-step:last-child { border-bottom: none; }
+.help-step-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--pri); color: #fff;
+  font-size: 14px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.help-step h3 { font-size: 14px; font-weight: 800; margin-bottom: 2px; color: var(--txt); }
+.help-step p { font-size: 12.5px; color: var(--txt2); line-height: 1.55; }
+.help-tip {
+  margin-top: 5px; background: var(--surf2);
+  border-left: 3px solid var(--pri);
+  border-radius: 0 6px 6px 0;
+  padding: 4px 10px; font-size: 11.5px; color: var(--pri-d); font-weight: 600;
+}
+.help-ex {
+  margin-top: 5px; background: #FFFDE7;
+  border: 1.5px solid #F9A825; border-radius: 8px; padding: 6px 10px;
+}
+.help-ex .ex-label { font-size: 10px; font-weight: 800; color: #E65100; margin-bottom: 2px; }
+.help-ex p { font-size: 11.5px; color: #4E342E; line-height: 1.5; }
+.help-tools { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.help-tool {
+  padding: 4px 10px; border-radius: 99px;
+  font-size: 11.5px; font-weight: 700; border: 1.5px solid;
+}
+.help-tool.gl { color: #1565C0; border-color: #1565C0; background: #E3F2FD; }
+.help-tool.mm { color: #2E7D32; border-color: #2E7D32; background: #E8F5E9; }
+.help-divider {
+  margin: 6px 0; padding: 8px 12px;
+  background: var(--surf2); border-radius: 10px;
+  font-size: 12px; font-weight: 800; color: var(--pri-d);
+}
+.help-edit-flow {
+  display: flex; align-items: center; gap: 6px; padding: 8px 0 4px;
+}
+.ef-card {
+  flex: 1; background: var(--surf); border: 1.5px solid var(--bdr);
+  border-radius: 10px; padding: 8px 6px; text-align: center;
+}
+.ef-card .ef-ic { font-size: 18px; margin-bottom: 3px; }
+.ef-card h4 { font-size: 11px; font-weight: 800; color: var(--txt); margin-bottom: 1px; }
+.ef-card p { font-size: 10px; color: var(--txt2); }
+.ef-arr { font-size: 14px; color: var(--bdr); flex-shrink: 0; font-weight: 900; }
+.ef-btns { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.ef-btn {
+  border-radius: 8px; padding: 5px 8px;
+  font-size: 11px; font-weight: 700; text-align: center; border: 1.5px solid;
+}
+.ef-btn.save { background: #E8F5EE; color: #2E7D32; border-color: #81C784; }
+.ef-btn.del { background: #FFEBEE; color: #C62828; border-color: #EF9A9A; }
+
 /* ───── Observation Detail Modal ───── */
 .modal-bg {
   position: fixed; inset: 0; background: rgba(0,0,0,.55);
@@ -1005,6 +1070,7 @@ body.map-fs-active #mainMapContainer {
   <div class="topbar">
     <h1>🌿 영생고 생태지도</h1>
     <button class="icon-btn" id="adminBtn" title="관리자 모드">🔒</button>
+    <button class="icon-btn" id="helpBtn" title="사용법 안내" onclick="openHelpModal()">❓</button>
     <button class="icon-btn" id="csvBtn" title="CSV 내보내기 (관리자)" style="display:none;" onclick="exportCSV()">📥</button>
     <button class="icon-btn" id="themeBtn" title="다크모드 전환">🌙</button>
     <button class="topbar-text-btn" id="logoutBtn" onclick="logoutToProfile()">처음화면</button>
@@ -1333,6 +1399,98 @@ body.map-fs-active #mainMapContainer {
       <button class="modal-nav-btn" id="modalNextBtn" onclick="modalNav(1)">▶</button>
     </div>
     <button class="modal-close" id="modalClose">닫기</button>
+  </div>
+</div>
+
+<!-- 도움말 모달 -->
+<div class="modal-bg" id="helpModalBg" onclick="closeHelpModal()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div class="help-header">
+      <h2>🌿 앱 사용법 안내</h2>
+      <p>과학탐구실험2 · 생태지도 기록 방법</p>
+    </div>
+    <div class="help-body">
+
+      <div class="help-step">
+        <div class="help-step-num">1</div>
+        <div>
+          <h3>학년·반·조·학번·이름 입력</h3>
+          <p>처음 접속할 때 한 번만 입력하면 다음부터 자동으로 채워져요.</p>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">2</div>
+        <div>
+          <h3>사진 촬영</h3>
+          <p>사진 영역을 탭하면 카메라가 열려요. 생물이 잘 보이도록 가까이 찍어주세요.</p>
+          <div class="help-tip">📍 GPS 정보가 있으면 지도 핀이 자동으로 찍혀요!</div>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">3</div>
+        <div>
+          <h3>생물 이름 동정 후 입력</h3>
+          <p>이름을 모를 때는 아래 도구로 검색하세요.</p>
+          <div class="help-tools">
+            <span class="help-tool gl">🔍 구글 렌즈</span>
+            <span class="help-tool mm">🌱 모야모</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">4</div>
+        <div>
+          <h3>발견 위치에 핀 찍기</h3>
+          <p>지도를 탭해서 발견한 곳에 정확히 핀을 찍어주세요. 자동 설정됐더라도 위치를 꼭 확인하세요!</p>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">5</div>
+        <div>
+          <h3>메모 자세히 작성 ✍️</h3>
+          <p>분류, 특징, 발견 상황 등을 구체적으로 적어요.</p>
+          <div class="help-ex">
+            <div class="ex-label">✍️ 메모 예시</div>
+            <p>강아지풀은 벼과 한해살이풀. 운동장 화단 가장자리에서 발견, 이삭이 연녹색이었다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">6</div>
+        <div>
+          <h3>기록 저장하기 버튼 탭!</h3>
+          <p>저장하면 전체 생태지도에 바로 표시돼요. 내 기록 탭에서 수정·삭제도 가능해요.</p>
+        </div>
+      </div>
+
+      <div class="help-divider">✏️ 내 기록 수정·삭제하는 방법</div>
+
+      <div class="help-edit-flow">
+        <div class="ef-card">
+          <div class="ef-ic">👤</div>
+          <h4>내기록 탭</h4>
+          <p>상단 탭 이동</p>
+        </div>
+        <div class="ef-arr">▶</div>
+        <div class="ef-card">
+          <div class="ef-ic">📋</div>
+          <h4>카드 탭</h4>
+          <p>기록 카드 탭</p>
+        </div>
+        <div class="ef-arr">▶</div>
+        <div class="ef-btns">
+          <div class="ef-btn save">✅ 수정 저장하기</div>
+          <div class="ef-btn del">🗑️ 이 기록 삭제하기</div>
+        </div>
+      </div>
+
+    </div>
+    <button class="modal-close" onclick="closeHelpModal()">닫기</button>
   </div>
 </div>
 
@@ -3792,6 +3950,10 @@ window.openEditModal = openEditModal;
 window.openEditInForm = openEditInForm;
 window.cancelEditMode = cancelEditMode;
 window.deleteFromForm = deleteFromForm;
+function openHelpModal() { document.getElementById('helpModalBg').classList.add('open'); }
+function closeHelpModal() { document.getElementById('helpModalBg').classList.remove('open'); }
+window.openHelpModal = openHelpModal;
+window.closeHelpModal = closeHelpModal;
 window.resetFormMapToSchool = resetFormMapToSchool;
 window.confirmDelete = confirmDelete;
 
