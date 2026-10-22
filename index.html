@@ -3195,7 +3195,11 @@ window.toggleLock = toggleLock;
 
 /* ──── Delete Record ──── */
 async function confirmDelete(id, species) {
-  if (!adminMode) { toast('🔒 관리자만 삭제할 수 있어요'); return; }
+  const obs = observations[id];
+  if (!adminMode && (!obs || !canEditRecord(obs))) {
+    toast('🔒 자신의 기록만 삭제할 수 있어요');
+    return;
+  }
   if (!confirm(`"${species}" 기록을 삭제할까요?`)) return;
   document.getElementById('modalBg').classList.remove('open');
   try {
