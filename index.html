@@ -1093,7 +1093,7 @@ body.map-fs-active #mainMapContainer {
         <!-- 메모 -->
         <div class="form-section">
           <label>메모 <span style="font-weight:400;color:var(--txt2)">(선택)</span></label>
-          <textarea class="inp" id="inpNotes" placeholder="예) 운동장 화단 근처에서 발견. 꽃이 피어 있었음. 3마리 정도 있었음."></textarea>
+          <textarea class="inp" id="inpNotes" placeholder="예) 강아지풀은 벼과 강아지풀속에 속하는 한해살이풀이다. 이삭이 강아지 꼬리를 닮아서 강아지풀이라 불린다. 운동장 화단 가장자리에서 발견하였으며 이삭이 연녹색을 띠고 있었다."></textarea>
         </div>
 
         <!-- 발견 장소 — 지도 핀 -->
@@ -1265,6 +1265,22 @@ body.map-fs-active #mainMapContainer {
         </div>
       </div>
 
+      <!-- 사진 (학생도 교체 가능) -->
+      <div class="edit-field-wrap" style="margin-bottom:12px;">
+        <label class="edit-field-label">사진</label>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <div id="editPhotoPreview" style="width:72px;height:72px;border-radius:10px;overflow:hidden;background:var(--surf2);border:1.5px solid var(--bdr);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;" onclick="document.getElementById('editPhotoInput').click()">📷</div>
+          <div style="flex:1;min-width:0;">
+            <div id="editPhotoStatus" style="font-size:12px;color:var(--txt2);margin-bottom:6px;">탭하여 사진 교체</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" onclick="document.getElementById('editPhotoInput').click()" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;border:1.5px solid var(--pri);background:transparent;color:var(--pri);cursor:pointer;">📷 교체</button>
+              <button type="button" id="editPhotoDelBtn" onclick="clearEditPhoto()" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:none;">✕ 삭제</button>
+            </div>
+          </div>
+        </div>
+        <input type="file" id="editPhotoInput" accept="image/*" style="display:none">
+      </div>
+
       <!-- 생물 이름 -->
       <div class="edit-field-wrap" style="margin-bottom:10px;">
         <label class="edit-field-label">생물 이름</label>
@@ -1280,7 +1296,7 @@ body.map-fs-active #mainMapContainer {
       <!-- 메모 (강조) -->
       <div class="edit-field-wrap" style="margin-bottom:16px;">
         <label class="edit-field-label" style="font-size:13px;color:var(--pri-d);font-weight:700;">📝 메모 <span style="font-weight:400;color:var(--txt2);font-size:11px;">(생태 특성, 관찰 내용)</span></label>
-        <textarea class="inp edit-field-inp" id="editNotes" placeholder="잎 모양, 색깔, 발견 상황 등 자유롭게 기록하세요…" rows="5"
+        <textarea class="inp edit-field-inp" id="editNotes" placeholder="예) 강아지풀은 벼과 강아지풀속 한해살이풀이다. 이삭이 강아지 꼬리를 닮아 강아지풀이라 불린다. 발견 위치, 색깔, 특징 등을 자세히 적어봐요." rows="5"
           style="resize:none;line-height:1.7;font-size:14px;border-color:var(--pri-m);"></textarea>
       </div>
 
@@ -1288,6 +1304,7 @@ body.map-fs-active #mainMapContainer {
         <button class="btn-sec" id="editCancel" style="flex:1;padding:13px;">취소</button>
         <button class="btn-pri" id="editSave" style="flex:2;padding:13px;font-size:15px;">✅ 저장하기</button>
       </div>
+      <button id="editDeleteBtn" onclick="deleteFromEditModal()" style="width:100%;margin-top:10px;padding:11px;border-radius:var(--r);border:1.5px solid #E57373;background:transparent;color:#C62828;font-size:14px;font-weight:600;cursor:pointer;">🗑️ 이 기록 삭제하기</button>
     </div>
   </div>
 </div>
@@ -1391,6 +1408,7 @@ function visibleEntries() {
   );
 }
 let editingId = null;
+let editPhotoData = null; // null=변경없음, ''=삭제, 'data:...'=새 사진
 let currentGroupFilter = 'all';
 
 /* ──── Boot ──── */
@@ -3183,6 +3201,49 @@ function openEditModal(id) {
   if (obs.location === '기타' || !ZONES.find(z => z.id === obs.location)) etcOpt.selected = true;
   sel.appendChild(etcOpt);
 
+  // 사진 초기화
+  editPhotoData = null;
+  const preview = document.getElementById('editPhotoPreview');
+  const statusEl = document.getElementById('editPhotoStatus');
+  const delBtn = document.getElementById('editPhotoDelBtn');
+  if (preview) {
+    if (obs.photo) {
+      preview.innerHTML = `<img src="${obs.photo}" style="width:100%;height:100%;object-fit:cover;" alt="">`;
+      if (statusEl) statusEl.textContent = '현재 사진 (탭하여 교체)';
+      if (delBtn) delBtn.style.display = '';
+    } else {
+      preview.innerHTML = '📷';
+      if (statusEl) statusEl.textContent = '탭하여 사진 추가';
+      if (delBtn) delBtn.style.display = 'none';
+    }
+  }
+  // 수정 모달 사진 파일 입력 이벤트 (한 번만 등록)
+  const editPhotoInput = document.getElementById('editPhotoInput');
+  if (editPhotoInput && !editPhotoInput._bound) {
+    editPhotoInput._bound = true;
+    editPhotoInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const preview2 = document.getElementById('editPhotoPreview');
+      if (preview2) preview2.innerHTML = '<span style="font-size:20px;animation:spin 1s linear infinite;display:inline-block;">⏳</span>';
+      let data = await compressImg(file, 800, 0.75);
+      if (data.length > 80000) data = await compressImg(file, 600, 0.65);
+      if (data.length > 60000) data = await compressImg(file, 480, 0.60);
+      editPhotoData = data;
+      if (preview2) preview2.innerHTML = `<img src="${data}" style="width:100%;height:100%;object-fit:cover;" alt="">`;
+      const st = document.getElementById('editPhotoStatus');
+      if (st) st.textContent = '새 사진 선택됨 ✅';
+      const db = document.getElementById('editPhotoDelBtn');
+      if (db) db.style.display = '';
+    });
+  }
+
+  // 삭제 버튼: 관리자 또는 자신의 기록만 표시
+  const editDelBtn = document.getElementById('editDeleteBtn');
+  if (editDelBtn) {
+    editDelBtn.style.display = (adminMode || canEditRecord(obs)) ? '' : 'none';
+  }
+
   document.getElementById('modalBg').classList.remove('open');
   document.getElementById('editModalBg').classList.add('open');
   // 메모 칸에 자동 포커스
@@ -3200,6 +3261,15 @@ async function saveEdit() {
   const location = document.getElementById('editLocation').value;
   if (!species) { toast('생물 이름을 입력하세요.'); return; }
   const updates = { class: cls, group, studentId: sid, name, species, notes, location };
+  // 사진 변경 여부
+  if (editPhotoData === '') {
+    updates.photo = null; // 삭제
+  } else if (editPhotoData) {
+    updates.photo = editPhotoData; // 새 사진
+  }
+  // 저장 중 표시
+  const saveBtn = document.getElementById('editSave');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block;">⏳</span> 저장 중…'; }
   try {
     await gasAPI('update', { id: editingId, data: updates });
     // 로컬 캐시 즉시 반영
@@ -3210,10 +3280,45 @@ async function saveEdit() {
     toast('✅ 수정 완료');
     document.getElementById('editModalBg').classList.remove('open');
     editingId = null;
+    editPhotoData = null;
   } catch(err) {
     toast('❌ 저장 실패: ' + err.message);
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '✅ 저장하기'; }
   }
 }
+
+function clearEditPhoto() {
+  editPhotoData = ''; // 빈 문자열 = 삭제 표시
+  const preview = document.getElementById('editPhotoPreview');
+  if (preview) preview.innerHTML = '📷';
+  const st = document.getElementById('editPhotoStatus');
+  if (st) st.textContent = '사진 삭제됨 (저장 시 적용)';
+  const db = document.getElementById('editPhotoDelBtn');
+  if (db) db.style.display = 'none';
+  const inp = document.getElementById('editPhotoInput');
+  if (inp) inp.value = '';
+}
+window.clearEditPhoto = clearEditPhoto;
+
+async function deleteFromEditModal() {
+  if (!editingId) return;
+  const obs = observations[editingId];
+  if (!obs) return;
+  if (!adminMode && !canEditRecord(obs)) { toast('🔒 자신의 기록만 삭제할 수 있어요'); return; }
+  if (!confirm(`"${obs.species}" 기록을 삭제할까요?`)) return;
+  document.getElementById('editModalBg').classList.remove('open');
+  try {
+    await gasAPI('delete', { id: editingId });
+    delete observations[editingId];
+    onData();
+    toast('🗑️ 삭제 완료');
+    editingId = null;
+  } catch(err) {
+    toast('❌ 삭제 실패: ' + err.message);
+  }
+}
+window.deleteFromEditModal = deleteFromEditModal;
 
 /* ──── Lock / Unlock ──── */
 async function toggleLock(id, currentlyLocked) {
