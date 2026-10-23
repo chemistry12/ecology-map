@@ -2350,7 +2350,14 @@ function toggleAdminEntry() {
   if (!box) return;
   const showing = box.style.display !== 'none';
   box.style.display = showing ? 'none' : 'block';
-  if (!showing) setTimeout(() => document.getElementById('profileAdminPw').focus(), 80);
+  if (!showing) {
+    // 비밀번호 입력창이 보이도록 스크롤 후 포커스
+    setTimeout(() => {
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const inp = document.getElementById('profileAdminPw');
+      if (inp) inp.focus();
+    }, 80);
+  }
 }
 
 function adminDirectEntry() {
