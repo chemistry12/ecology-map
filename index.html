@@ -2487,9 +2487,44 @@ async function handleSubmit() {
       studentId: sid,
 
 
-[truncated to 100000 chars]
+      name:      name,
+      species:   sp,
+      notes:     notes,
+      photo:     photoUrl,
+      lat:       pinLat,
+      lng:       pinLng,
+      zone:      selectedZone,
+    };
 
-Tab Context:
-- Executed on tabId: seed
-- Available tabs:
-  • tabId seed: "https://raw.githubusercontent.com/chemistry12/ecology-map/main/index.html" ("https://raw.githubusercontent.com/chemistry12/ecology-map/main/index.html")
+    let result;
+    if (editModeId) {
+      result = await gasAPI('edit', { id: editModeId, ...data });
+    } else {
+      result = await gasAPI('add', data);
+    }
+
+    if (!result || result.error) throw new Error(result?.error || '서버 오류');
+
+    // 내 기록 총 개수 (GAS에서 반환하거나 로컬 카운트)
+    const myTotal = result.total || Object.values(observations).filter(o => o.studentId === sid && o.name === name).length + (wasEditMode ? 0 : 1);
+
+    resetForm();
+    await fetchAll();
+
+    if (wasEditMode) {
+      toast('✅ 기록이 수정됐어요!');
+    } else {
+      showSuccess(sp, cls, grp, name, myTotal);
+    }
+  } catch(e) {
+    toast('❌ 오류: ' + (e.message || '알 수 없는 오류'));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✅ 저장하기';
+  }
+}
+window.handleSubmit = handleSubmit;
+
+</script>
+</body>
+</html>
