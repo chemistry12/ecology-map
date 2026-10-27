@@ -2553,21 +2553,31 @@ document.addEventListener('keydown', e => {
 window.toggleMapFs = toggleMapFs;
 
 /* ──── Photo Pin Icon ──── */
-// CSS border-radius 방식 — SVG clipPath 누락 문제 없음, 핀 많아도 안정적
+// SVG <image> + <clipPath> 방식 — 고유 ID로 클립패스 충돌 방지
+let _pinIconSeq = 0;
 function makePhotoIcon(photo, color) {
-  const html = `<div style="position:relative;width:44px;height:54px;cursor:pointer;">
-    <svg width="44" height="54" viewBox="0 0 44 54"
-        xmlns="http://www.w3.org/2000/svg"
-        style="position:absolute;top:0;left:0;pointer-events:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35))">
+  const uid = 'pc' + Date.now().toString(36) + (++_pinIconSeq);
+  const svg = `<svg width="44" height="54" viewBox="0 0 44 54"
+      xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+      style="pointer-events:none;display:block;overflow:visible;">
+    <defs>
+      <clipPath id="${uid}"><circle cx="22" cy="22" r="16"/></clipPath>
+      <filter id="${uid}f" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.35"/>
+      </filter>
+    </defs>
+    <g filter="url(#${uid}f)">
       <path d="M22 1C10.402 1 1 10.402 1 22C1 34 22 53 22 53C22 53 43 34 43 22C43 10.402 33.598 1 22 1Z" fill="${color}"/>
       <circle cx="22" cy="22" r="17" fill="white"/>
-    </svg>
-    <img src="${photo}"
-      style="position:absolute;top:5px;left:5px;width:34px;height:34px;border-radius:50%;object-fit:cover;pointer-events:none;"
-      onerror="this.style.display='none'" />
-  </div>`;
+      <image href="${photo}" xlink:href="${photo}"
+        x="6" y="6" width="32" height="32"
+        clip-path="url(#${uid})"
+        preserveAspectRatio="xMidYMid slice"/>
+    </g>
+  </svg>`;
   return L.divIcon({
-    html, className: '', iconSize: [44, 54], iconAnchor: [22, 54], popupAnchor: [0, -54]
+    html: svg,
+    iconSize: [44, 54], iconAnchor: [22, 54], popupAnchor: [0, -54], className: ''
   });
 }
 
