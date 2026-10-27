@@ -1525,7 +1525,9 @@ function initBackGuard() {
     const modalBg     = document.getElementById('modalBg');
     const editModalBg = document.getElementById('editModalBg');
     let closedModal = false;
-    if (modalBg     && modalBg.classList.contains('open'))     { modalBg.classList.remove('open');     closedModal = true; }
+    if (modalBg     && modalBg.classList.contains('open'))     { modalBg.classList.remove('open');     closedModal = true;
+      if (_returnToSummary) { _returnToSummary = false; setTimeout(() => document.getElementById('summaryModalBg').classList.add('open'), 80); }
+    }
     if (editModalBg && editModalBg.classList.contains('open')) { editModalBg.classList.remove('open'); closedModal = true; }
     const summaryBg = document.getElementById('summaryModalBg');
     if (summaryBg   && summaryBg.classList.contains('open'))   { summaryBg.classList.remove('open');   closedModal = true; }
@@ -2948,7 +2950,8 @@ function openSummary() {
       card.appendChild(speciesEl);
       card.appendChild(nameEl);
       card.addEventListener('click', () => {
-        closeSummary();
+        _returnToSummary = true;
+        document.getElementById('summaryModalBg').classList.remove('open');
         setTimeout(() => openModal(id, obs, cardList), 80);
       });
       grid.appendChild(card);
@@ -3096,7 +3099,13 @@ function openModal(id, obs, list) {
 
 function _closeModal() {
   document.getElementById('modalBg').classList.remove('open');
+  // 요약에서 열었으면 요약으로 복귀
+  if (_returnToSummary) {
+    _returnToSummary = false;
+    setTimeout(() => document.getElementById('summaryModalBg').classList.add('open'), 80);
+  }
 }
+let _returnToSummary = false;
 
 function _renderModalContent(id, obs) {
   const zone = ZONES.find(z => z.id === obs.location);
@@ -4029,6 +4038,13 @@ window.confirmDelete = confirmDelete;
       if (lb.classList.contains('open')) {
         if (history.state && history.state.modal === 'lightbox') history.back();
         else closeLightbox();
+      } else {
+        const modalBg = document.getElementById('modalBg');
+        const editBg  = document.getElementById('editModalBg');
+        const sumBg   = document.getElementById('summaryModalBg');
+        if (modalBg && modalBg.classList.contains('open'))  { _closeModal(); return; }
+        if (editBg  && editBg.classList.contains('open'))   { editBg.classList.remove('open'); return; }
+        if (sumBg   && sumBg.classList.contains('open'))    { closeSummary(); }
       }
     }
   });
