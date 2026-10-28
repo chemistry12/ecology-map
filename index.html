@@ -1995,6 +1995,7 @@ function adminDirectEntry() {
   toast('관리자 모드로 입장했어요');
   renderClassView();
   updateAdminUI();
+  applyStudentInfo();
   setTimeout(() => {
     if (formMapL) formMapL.invalidateSize();
     if (mainMapL) mainMapL.invalidateSize();
