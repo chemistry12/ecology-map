@@ -1166,6 +1166,7 @@ body.map-fs-active #mainMapContainer {
           <button id="deleteClassBtn" onclick="deleteClassAll()" style="display:none;font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;background:#FFF0EE;border:1.5px solid #E57373;color:#C62828;cursor:pointer;">🗑️ 이 반 전체 삭제</button>
           <button id="refreshClassBtn" onclick="refreshClassView()" style="font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;background:var(--surf2);border:1.5px solid var(--bdr);color:var(--txt2);cursor:pointer;margin-left:auto;display:flex;align-items:center;gap:5px;"><span id="refreshClassIcon">🔄</span> 새로고침</button>
           <button id="summaryBtn" onclick="openSummary()" style="font-size:13px;font-weight:800;padding:8px 16px;border-radius:10px;background:var(--pri);border:none;color:#fff;cursor:pointer;">📋 요약하기</button>
+          <button id="progressBtn" onclick="openStudentProgress()" style="display:none;font-size:13px;font-weight:800;padding:8px 16px;border-radius:10px;background:#1565C0;border:none;color:#fff;cursor:pointer;">📊 개인별 현황</button>
         </div>
         <div class="group-filter-row" id="groupFilterRow"></div>
         <div style="position:relative;">
@@ -1178,19 +1179,6 @@ body.map-fs-active #mainMapContainer {
       </div>
     </div>
 
-
-    <!-- ── Tab 3: 생태지도 ── -->
-    <div class="tab-pane" id="tab-map">
-      <div id="mapFilterRow">
-        <div id="classFilterChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
-      </div>
-      <div style="position:relative;">
-        <div id="mainMapContainer">
-          <button class="map-fs-btn" id="mainFsBtn" title="전체화면" onclick="toggleMapFs('main')">⛶</button>
-        </div>
-      </div>
-      <div id="mapLegend" style="padding:10px 16px;"></div>
-    </div>
 
     <!-- ── Tab 4: 내 기록 ── -->
     <div class="tab-pane" id="tab-mine">
@@ -1228,9 +1216,6 @@ body.map-fs-active #mainMapContainer {
     </button>
     <button class="nav-btn" data-tab="tab-class">
       <span class="nav-icon">🗺️</span>모아보기
-    </button>
-    <button class="nav-btn" data-tab="tab-map">
-      <span class="nav-icon">🌿</span>생태지도
     </button>
     <button class="nav-btn" data-tab="tab-mine">
       <span class="nav-icon">🧑</span>내 기록
@@ -1397,6 +1382,28 @@ body.map-fs-active #mainMapContainer {
       <button class="modal-nav-btn" id="modalNextBtn" onclick="modalNav(1)">▶</button>
     </div>
     <button class="modal-close" id="modalClose">닫기</button>
+  </div>
+</div>
+
+<!-- 학생 제출 현황 모달 -->
+<div class="modal-bg" id="progressModalBg" onclick="if(event.target===this)closeStudentProgress()" style="align-items:center;">
+  <div class="modal" style="width:min(94vw,560px);max-width:none;padding:0;overflow:hidden;max-height:90vh;display:flex;flex-direction:column;">
+    <div style="background:linear-gradient(135deg,#1565C0,#1976D2);padding:16px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+      <span style="font-size:22px;">📊</span>
+      <div style="flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#fff;">개인별 제출 현황</div>
+        <div id="progressModalSub" style="font-size:13px;color:rgba(255,255,255,.8);margin-top:3px;"></div>
+      </div>
+      <button onclick="closeStudentProgress()" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;width:36px;height:36px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--bdr);display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
+      <button id="progFilterAll" onclick="setProgFilter('all')" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:99px;border:1.5px solid #1565C0;background:#1565C0;color:#fff;cursor:pointer;">전체</button>
+      <button id="progFilterShort" onclick="setProgFilter('short')" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:99px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;">미달만 보기</button>
+      <select class="inp" id="progClassSel" style="max-width:160px;padding:6px 10px;font-size:13px;margin-bottom:0;" onchange="renderStudentProgress()">
+        <option value="">전체 반</option>
+      </select>
+    </div>
+    <div id="progressList" style="overflow-y:auto;padding:4px 16px 16px;"></div>
   </div>
 </div>
 
@@ -2305,6 +2312,8 @@ function adminDirectEntry() {
   applyStudentInfo();
   document.getElementById('adminBtn').textContent = '🔓';
   document.getElementById('csvBtn').style.display = '';
+  const _pBtn = document.getElementById('progressBtn');
+  if (_pBtn) _pBtn.style.display = '';
   toast('🔓 관리자 모드로 입장했어요');
   renderClassView();
   updateAdminUI();
@@ -2946,6 +2955,104 @@ function renderClassView() {
 }
 
 /* ──── 요약하기 ──── */
+/* ──── 학생 제출 현황 ──── */
+const MIN_RECORDS = 8;
+let _progFilter = 'all';
+
+function openStudentProgress() {
+  if (!adminMode) return;
+  _progFilter = 'all';
+  document.getElementById('progFilterAll').style.background = '#1565C0';
+  document.getElementById('progFilterAll').style.color = '#fff';
+  document.getElementById('progFilterAll').style.borderColor = '#1565C0';
+  document.getElementById('progFilterShort').style.background = 'transparent';
+  document.getElementById('progFilterShort').style.color = 'var(--txt2)';
+  document.getElementById('progFilterShort').style.borderColor = 'var(--bdr)';
+  const sel = document.getElementById('progClassSel');
+  if (sel) {
+    const classes = [...new Set(
+      Object.values(observations)
+        .map(o => o.class)
+        .filter(c => c && !TEST_CLASSES.includes(c))
+    )].sort((a, b) => a.localeCompare(b, 'ko'));
+    sel.innerHTML = '<option value="">전체 반</option>' + classes.map(c => `<option>${c}</option>`).join('');
+  }
+  renderStudentProgress();
+  document.getElementById('progressModalBg').classList.add('open');
+}
+
+function closeStudentProgress() {
+  document.getElementById('progressModalBg').classList.remove('open');
+}
+
+function setProgFilter(f) {
+  _progFilter = f;
+  const all = document.getElementById('progFilterAll');
+  const short = document.getElementById('progFilterShort');
+  if (f === 'all') {
+    all.style.cssText += 'background:#1565C0;color:#fff;border-color:#1565C0;';
+    short.style.cssText += 'background:transparent;color:var(--txt2);border-color:var(--bdr);';
+  } else {
+    short.style.cssText += 'background:#E53935;color:#fff;border-color:#E53935;';
+    all.style.cssText += 'background:transparent;color:var(--txt2);border-color:var(--bdr);';
+  }
+  renderStudentProgress();
+}
+
+function renderStudentProgress() {
+  const filterCls = (document.getElementById('progClassSel') || {}).value || '';
+  const stuMap = {};
+  Object.values(observations).forEach(o => {
+    if (!o.studentId || !o.name) return;
+    if (TEST_CLASSES.includes(o.class)) return; // 테스트반 제외
+    const key = o.studentId + '_' + (o.class || '');
+    if (!stuMap[key]) stuMap[key] = { sid: o.studentId, name: o.name, cls: o.class || '', grp: o.group || '', count: 0 };
+    stuMap[key].count++;
+  });
+
+  let students = Object.values(stuMap);
+  if (filterCls) students = students.filter(s => s.cls === filterCls);
+  if (_progFilter === 'short') students = students.filter(s => s.count < MIN_RECORDS);
+
+  students.sort((a, b) => {
+    if (a.cls !== b.cls) return a.cls.localeCompare(b.cls, 'ko');
+    return a.sid.localeCompare(b.sid);
+  });
+
+  const totalShort = Object.values(stuMap).filter(s => s.count < MIN_RECORDS && (!filterCls || s.cls === filterCls)).length;
+  const sub = document.getElementById('progressModalSub');
+  if (sub) sub.textContent = `총 ${Object.values(stuMap).filter(s => !filterCls || s.cls === filterCls).length}명 · 미달(${MIN_RECORDS}개 미만) ${totalShort}명`;
+
+  const list = document.getElementById('progressList');
+  if (!list) return;
+  if (!students.length) {
+    list.innerHTML = '<div style="text-align:center;padding:32px;color:var(--txt2);">해당하는 학생이 없어요</div>';
+    return;
+  }
+
+  list.innerHTML = students.map(s => {
+    const pct = Math.min(100, Math.round(s.count / MIN_RECORDS * 100));
+    const done = s.count >= MIN_RECORDS;
+    const barColor = done ? '#43A047' : s.count >= 6 ? '#FB8C00' : '#E53935';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr);">
+      <div style="min-width:52px;font-size:11px;color:var(--txt2);">${s.cls.replace('1학년 ','')}</div>
+      <div style="min-width:48px;font-size:11px;color:var(--txt2);">${s.sid}</div>
+      <div style="flex:1;font-size:14px;font-weight:700;color:var(--txt);">${s.name}<span style="font-size:11px;font-weight:400;color:var(--txt2);margin-left:4px;">${s.grp}</span></div>
+      <div style="text-align:right;min-width:72px;">
+        <div style="font-size:15px;font-weight:800;color:${barColor};">${s.count}개 ${done ? '✅' : '⚠️'}</div>
+        <div style="height:4px;border-radius:2px;background:var(--surf2);margin-top:3px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.openStudentProgress = openStudentProgress;
+window.closeStudentProgress = closeStudentProgress;
+window.setProgFilter = setProgFilter;
+window.renderStudentProgress = renderStudentProgress;
+
 function openSummary() {
   const viewSel = document.getElementById('classViewSel');
   const cls = viewSel?.value || '__all__';
@@ -3286,15 +3393,6 @@ function switchTab(tabId) {
       }
     }, 800);
   }
-  if (tabId === 'tab-map') {
-    initMainMap();
-    setTimeout(() => {
-      if (mainMapL) { mainMapL.invalidateSize(); renderMapPins(); }
-    }, 200);
-    setTimeout(() => {
-      if (mainMapL) mainMapL.invalidateSize();
-    }, 800);
-  }
 }
 
 /* ──── Theme ──── */
@@ -3475,13 +3573,15 @@ function updateAdminUI() {
     });
   });
 
-  // 학급별 탭 전체 잠금 / 전체 해제 / 반 전체 삭제 버튼
+  // 학급별 탭 전체 잠금 / 전체 해제 / 반 전체 삭제 / 개인별 현황 버튼
   const lockClassBtn   = document.getElementById('lockAllClassBtn');
   const unlockClassBtn = document.getElementById('unlockAllClassBtn');
   const deleteClassBtn = document.getElementById('deleteClassBtn');
+  const progressBtn    = document.getElementById('progressBtn');
   if (lockClassBtn)   lockClassBtn.style.display   = adminMode ? '' : 'none';
   if (unlockClassBtn) unlockClassBtn.style.display = adminMode ? '' : 'none';
   if (deleteClassBtn) deleteClassBtn.style.display = adminMode ? '' : 'none';
+  if (progressBtn)    progressBtn.style.display    = adminMode ? '' : 'none';
   // 현재 내 기록 탭이 열려있으면 새로고침
   const minePane = document.getElementById('tab-mine');
   if (minePane && minePane.classList.contains('active')) {
