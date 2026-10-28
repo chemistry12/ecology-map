@@ -1137,11 +1137,12 @@ body.map-fs-active #mainMapContainer {
         <div class="form-section">
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <label>발견 장소 <span style="font-weight:400;color:var(--txt2)">(지도를 탭하여 핀 설정)</span></label>
-            <button type="button" class="btn-gps" id="gpsBtn">📡 현재 위치</button>
+            <button type="button" class="btn-gps" id="gpsBtn" style="display:none;">📡 현재 위치</button>
           </div>
           <div id="autoZoneDisplay" style="min-height:24px;margin:6px 0 8px;"></div>
-          <div id="formMapTools" style="display:none;margin-bottom:6px;">
-            <button type="button" class="btn-sec" style="font-size:12px;padding:5px 12px;" onclick="resetFormMapToSchool()">🏫 학교로 돌아가기</button>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+            <button type="button" class="btn-sec" style="font-size:12px;padding:5px 12px;" onclick="resetFormMapToSchool()">🏫 학교로 돌아오기</button>
+            <div id="formMapTools" style="display:none;"></div>
           </div>
           <div id="formMap" style="height:250px;border-radius:var(--r);overflow:hidden;border:1.5px solid var(--bdr);"></div>
         </div>
@@ -1177,6 +1178,19 @@ body.map-fs-active #mainMapContainer {
       </div>
     </div>
 
+
+    <!-- ── Tab 3: 생태지도 ── -->
+    <div class="tab-pane" id="tab-map">
+      <div id="mapFilterRow">
+        <div id="classFilterChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
+      </div>
+      <div style="position:relative;">
+        <div id="mainMapContainer">
+          <button class="map-fs-btn" id="mainFsBtn" title="전체화면" onclick="toggleMapFs('main')">⛶</button>
+        </div>
+      </div>
+      <div id="mapLegend" style="padding:10px 16px;"></div>
+    </div>
 
     <!-- ── Tab 4: 내 기록 ── -->
     <div class="tab-pane" id="tab-mine">
@@ -1214,6 +1228,9 @@ body.map-fs-active #mainMapContainer {
     </button>
     <button class="nav-btn" data-tab="tab-class">
       <span class="nav-icon">🗺️</span>모아보기
+    </button>
+    <button class="nav-btn" data-tab="tab-map">
+      <span class="nav-icon">🌿</span>생태지도
     </button>
     <button class="nav-btn" data-tab="tab-mine">
       <span class="nav-icon">🧑</span>내 기록
@@ -1337,7 +1354,7 @@ body.map-fs-active #mainMapContainer {
       <div style="margin-bottom:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
           <label class="edit-field-label">발견 위치 <span style="font-weight:400;font-size:11px;color:var(--txt2)">(지도를 탭하여 핀 이동)</span></label>
-          <button type="button" class="btn-gps" id="editGpsBtn">📡 현재 위치</button>
+          <button type="button" class="btn-gps" id="editGpsBtn" style="display:none;">📡 현재 위치</button>
         </div>
         <div id="editAutoZoneDisplay" style="min-height:22px;margin:4px 0 6px;"></div>
         <div id="editMapTools" style="display:none;margin-bottom:6px;">
@@ -2278,11 +2295,14 @@ function adminDirectEntry() {
   }
   // 관리자 모드로 앱 진입
   adminMode = true;
+  // 관리자 테스트용 기본 학생 정보 자동 설정
+  saveStudentInfo('1학년 12반(테스트)', '1조', '11201', '김가연');
   const overlay = document.getElementById('profileSetup');
   if (overlay) { overlay.style.display = 'none'; overlay.classList.add('hidden'); }
   const appEl = document.getElementById('app');
   appEl.style.display = 'flex';
   appEl.classList.add('admin-active');
+  applyStudentInfo();
   document.getElementById('adminBtn').textContent = '🔓';
   document.getElementById('csvBtn').style.display = '';
   toast('🔓 관리자 모드로 입장했어요');
@@ -2641,6 +2661,20 @@ function makePhotoIcon(photo, color) {
   });
 }
 
+/* ──── Batched Map Add (주 생태지도 전용) ──── */
+// addTo() 호출 시 base64 이미지 디코딩이 일어나므로 160개 한꺼번에 추가하면 브라우저 버벅
+// → 20개씩 50ms 간격으로 나눠서 추가. 필터 변경 시 이전 배치는 취소됨.
+let _mainBatchGen = 0;
+function _batchAddToMap(queue, mapL, markerList, gen, batchSize, delay) {
+  if (gen !== _mainBatchGen) return; // 새 렌더 시작됨 → 이전 배치 취소
+  batchSize = batchSize || 20;
+  delay = delay || 50;
+  if (!queue.length) return;
+  const batch = queue.splice(0, batchSize);
+  batch.forEach(function(m) { m.addTo(mapL); markerList.push(m); });
+  if (queue.length) setTimeout(function() { _batchAddToMap(queue, mapL, markerList, gen, batchSize, delay); }, delay);
+}
+
 /* ──── Map Rendering ──── */
 function classColor(className) {
   // Derive index from class string
@@ -2666,6 +2700,8 @@ function renderMapPins() {
     .sort(([, a], [, b]) => b.timestamp - a.timestamp)
     .map(([id, obs]) => ({ id, obs }));
 
+  // 마커 객체 미리 생성 (addTo 전 단계는 빠름)
+  const markerQueue = [];
   visibleEntries().forEach(([id, obs]) => {
     if (activeFilter !== 'all' && obs.class !== activeFilter) return;
     const lat = obs.lat || (obs.mapY != null && (37.3051 - obs.mapY * 0.0014));
@@ -2684,9 +2720,11 @@ function renderMapPins() {
     }
     m.on('click', () => openModal(id, obs, mapList));
     m.bindTooltip(`${em} ${obs.species} · ${obs.class} ${obs.group}`, { direction: 'top' });
-    m.addTo(mainMapL);
-    obsMarkersMain.push(m);
+    markerQueue.push(m);
   });
+  // 배치로 나눠서 지도에 추가 (이미지 디코딩 부하 분산)
+  const _myGen = ++_mainBatchGen;
+  _batchAddToMap(markerQueue, mainMapL, obsMarkersMain, _myGen);
 
   mainMapL.invalidateSize();
   renderClassFilterChips();
@@ -3246,6 +3284,15 @@ function switchTab(tabId) {
         classMapL.invalidateSize();
         renderClassView();
       }
+    }, 800);
+  }
+  if (tabId === 'tab-map') {
+    initMainMap();
+    setTimeout(() => {
+      if (mainMapL) { mainMapL.invalidateSize(); renderMapPins(); }
+    }, 200);
+    setTimeout(() => {
+      if (mainMapL) mainMapL.invalidateSize();
     }, 800);
   }
 }
