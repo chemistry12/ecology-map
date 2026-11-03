@@ -661,6 +661,23 @@ textarea.inp { min-height: 112px; resize: vertical; line-height: 1.6; }
   #modal:has(.modal-img) .modal-time { font-size: 15px; }
 }
 
+/* PC 기록 창 자동 넘김 */
+.slide-ctrl { display: none; }
+@media (min-width: 1100px) {
+  .slide-ctrl { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 0 var(--pad) 12px; }
+  #modalNavRow[style*="none"] + .slide-ctrl { display: none; }
+  #modal:has(.modal-img) { grid-template-rows: minmax(0, 1fr) auto auto auto; }
+  #modal:has(.modal-img) .slide-ctrl { grid-column: 2; grid-row: 2; padding: 0 32px 12px; }
+  #modal:has(.modal-img) .modal-nav-row { grid-row: 3; }
+  #modal:has(.modal-img) .modal-close { grid-row: 4; }
+}
+.slide-btn { min-height: 44px; border-radius: var(--radius-control); background: var(--primary); color: var(--surface); font-size: 15px; font-weight: 600; transition: background .15s; }
+.slide-ctrl.playing .slide-btn { background: var(--surface); color: var(--text); border: 1px solid var(--control); }
+.slide-ctrl select.inp { width: auto; min-height: 44px; }
+.slide-progress { grid-column: 1 / -1; height: 4px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.slide-progress i { display: block; width: 0; height: 100%; background: var(--accent); }
+@keyframes slideFill { from { width: 0; } to { width: 100%; } }
+
 /* 모아보기 크게 보기: 지도 위 반 이름 + 조 버튼 (수업 화면에서 보이게 크게) */
 .fs-group-bar {
   display: none; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000;
@@ -4233,6 +4250,77 @@ function renderInsights() {
   const f = window.renderClassView;
   window.renderClassView = function () { const r = f.apply(this, arguments); renderInsights(); return r; };
 })();
+
+/* ──── PC 기록 창 자동 넘김 (슬라이드쇼) ────
+   이전/다음 위에 [자동 넘김] 버튼과 간격 선택, 진행 막대. 스페이스바로도 켜고 끔.
+   직접 이전/다음을 누르면 시간이 처음부터 다시, 창을 닫으면 멈춤. 다음 사진은 미리 불러 둠. */
+let slideTimer = null;
+function slideMs() { const s = document.getElementById('slideSpeed'); return (s ? +s.value : 5) * 1000; }
+function slideProgress() {
+  const bar = document.querySelector('#slideCtrl .slide-progress i');
+  if (!bar) return;
+  bar.style.animation = 'none';
+  void bar.offsetWidth;
+  bar.style.animation = slideTimer ? `slideFill ${slideMs()}ms linear forwards` : 'none';
+}
+function setSlideUI() {
+  const c = document.getElementById('slideCtrl');
+  if (!c) return;
+  c.classList.toggle('playing', !!slideTimer);
+  c.querySelector('.slide-btn').textContent = slideTimer ? '멈춤' : '자동 넘김';
+  slideProgress();
+}
+function startSlides() {
+  clearInterval(slideTimer);
+  slideTimer = setInterval(() => modalNav(1), slideMs());
+  setSlideUI();
+}
+function stopSlides() {
+  if (!slideTimer) return;
+  clearInterval(slideTimer);
+  slideTimer = null;
+  setSlideUI();
+}
+function preloadNextPhoto() {
+  if (_modalList.length < 2) return;
+  const next = _modalList[(_modalIdx + 1) % _modalList.length];
+  if (next && next.obs && next.obs.photo) { const im = new Image(); im.src = photoSrc(next.obs.photo, 1200); }
+}
+(function () {
+  const nav = window.modalNav;
+  window.modalNav = function () {
+    const r = nav.apply(this, arguments);
+    if (slideTimer) startSlides();
+    preloadNextPhoto();
+    return r;
+  };
+  const open = window.openModal;
+  window.openModal = function () { const r = open.apply(this, arguments); preloadNextPhoto(); return r; };
+})();
+document.addEventListener('DOMContentLoaded', () => {
+  const row = document.getElementById('modalNavRow');
+  if (!row) return;
+  const c = document.createElement('div');
+  c.id = 'slideCtrl';
+  c.className = 'slide-ctrl';
+  c.innerHTML = '<button type="button" class="slide-btn">자동 넘김</button>' +
+    '<label class="sr-only" for="slideSpeed">넘기는 간격</label>' +
+    '<select id="slideSpeed" class="inp"><option value="3">3초</option><option value="5" selected>5초</option><option value="8">8초</option><option value="12">12초</option></select>' +
+    '<div class="slide-progress"><i></i></div>';
+  row.after(c);
+  c.querySelector('.slide-btn').addEventListener('click', () => (slideTimer ? stopSlides() : startSlides()));
+  c.querySelector('#slideSpeed').addEventListener('change', () => { if (slideTimer) startSlides(); });
+  new MutationObserver(() => {
+    if (!document.getElementById('modalBg').classList.contains('open')) stopSlides();
+  }).observe(document.getElementById('modalBg'), { attributes: true, attributeFilter: ['class'] });
+  document.addEventListener('keydown', e => {
+    if (e.key !== ' ' || !WIDE_DETAIL.matches) return;
+    if (!document.getElementById('modalBg').classList.contains('open') || _modalList.length < 2) return;
+    if (/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName)) return;
+    e.preventDefault();
+    slideTimer ? stopSlides() : startSlides();
+  });
+});
 
 /* 반을 고르기 전 모아보기: 지도는 학교만, 기록은 없음 */
 function renderClassEmpty() {
