@@ -531,6 +531,16 @@ textarea.inp { min-height: 112px; resize: vertical; line-height: 1.6; }
 .kpi .l { font-size: var(--fs-meta); color: var(--muted); text-align: right; }
 .kpi.lead .v { color: var(--accent); }
 #mineCount { margin-bottom: var(--gap); }
+/* 내 기록 지도 */
+.mine-map-card { margin-bottom: 4px; }
+.mine-map-card .class-map-container { height: 300px; }
+@media (min-width: 900px) { .mine-map-card .class-map-container { height: 420px; } }
+.mine-map-card[hidden], #mineListHead[hidden] { display: none; }
+/* 관리자: 학생 화면(테스트) / 전체 학생 기록 */
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--active); }
+.seg button { min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: var(--fs-small); font-weight: 500; color: var(--muted); }
+.seg button.active { background: var(--surface); color: var(--text); font-weight: 600; }
+#mineAdminRow.mode-test .mine-all-only { display: none; }
 #mineCount:empty { display: none; }
 
 /* ───── Dialogs ───── */
@@ -984,8 +994,12 @@ body.map-fs-active .topbar, body.map-fs-active .bottom-nav { display: none !impo
           <button class="btn-pri" id="mineLookupBtn">조회</button>
         </div>
         <div id="mineAdminRow">
+          <div class="seg" id="mineModeSeg" role="group" aria-label="보기 방식">
+            <button type="button" data-mine="test" class="active" aria-pressed="true">학생 화면 (테스트)</button>
+            <button type="button" data-mine="all" aria-pressed="false">전체 학생 기록</button>
+          </div>
           <label class="sr-only" for="mineClassFilter">반</label>
-          <select id="mineClassFilter" class="inp" onchange="renderAllStudentRecords()">
+          <select id="mineClassFilter" class="inp mine-all-only" onchange="renderAllStudentRecords()">
             <option value="__all__">전체 반</option>
             <option>1학년 1반</option><option>1학년 2반</option><option>1학년 3반</option>
             <option>1학년 4반</option><option>1학년 5반</option><option>1학년 6반</option>
@@ -993,9 +1007,13 @@ body.map-fs-active .topbar, body.map-fs-active .bottom-nav { display: none !impo
             <option>1학년 10반</option><option>1학년 11반</option>
             <option>1학년 12반(테스트)</option>
           </select>
-          <button id="lockAllMineBtn" class="tool-btn" onclick="lockAll()">전체 잠금</button>
+          <button id="lockAllMineBtn" class="tool-btn mine-all-only" onclick="lockAll()">전체 잠금</button>
         </div>
         <div id="mineCount"></div>
+        <div class="panel map-card mine-map-card" id="mineMapCard">
+          <div class="class-map-container" id="mineMapContainer"></div>
+        </div>
+        <div class="list-head" id="mineListHead"><h2>기록</h2><span class="hint">최근 기록부터</span></div>
         <div class="obs-list" id="mineList"></div>
       </div>
     </section>
@@ -4320,6 +4338,91 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     slideTimer ? stopSlides() : startSlides();
   });
+});
+
+/* ──── 내 기록: 내 기록만 지도에 ────
+   학생: 로그인한 학번의 기록만 핀으로 (모아보기와 같은 모양, 누르면 기록 창).
+   관리자: [학생 화면 (테스트)] = 관리자 입장 때 정해진 테스트 학생(11201) 기준으로 학생과 똑같이 보기 / [전체 학생 기록] = 원래 목록. */
+let mineMapL = null, mineMarkers = [], mineMode = 'test';
+function initMineMap() {
+  if (mineMapL) { setTimeout(() => mineMapL.invalidateSize(), 50); return; }
+  mineMapL = L.map('mineMapContainer', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
+    .setView(SCHOOL_CENTER, SCHOOL_ZOOM);
+  L.tileLayer(OSM_URL, OSM_OPTS).addTo(mineMapL);
+  mineMapL.on('zoomend', () => applyPinScale(mineMapL, mineMarkers));
+  setupMapGesture(document.getElementById('mineMapContainer'), mineMapL);
+  if (typeof setupTapToActivate === 'function') setupTapToActivate(mineMapL);
+  setTimeout(() => mineMapL.invalidateSize(), 50);
+}
+function renderMineMap(entries) {
+  const card = document.getElementById('mineMapCard');
+  const head = document.getElementById('mineListHead');
+  if (card) card.hidden = false;
+  if (head) head.hidden = !entries.length;
+  if (!mineMapL) return;
+  mineMarkers.forEach(m => mineMapL.removeLayer(m));
+  mineMarkers = [];
+  const list = entries.slice().sort(([, a], [, b]) => b.timestamp - a.timestamp).map(([id, obs]) => ({ id, obs }));
+  list.forEach(({ id, obs }) => {
+    const lat = parseFloat(obs.lat), lng = parseFloat(obs.lng);
+    if (!lat || !lng) return;
+    const color = groupColor(obs.group);
+    const m = obs.photo
+      ? L.marker([lat, lng], { icon: makePhotoIcon(obs.photo, color) })
+      : L.circleMarker([lat, lng], { radius: 14, color, fillColor: color, fillOpacity: 0.9, weight: 3 });
+    m.on('click', () => openModal(id, obs, list));
+    m.bindTooltip(`${obs.species} · ${formatTime(obs.timestamp)}`, { direction: 'top' });
+    m.addTo(mineMapL);
+    mineMarkers.push(m);
+  });
+  applyPinScale(mineMapL, mineMarkers);
+}
+function hideMineMap() {
+  const card = document.getElementById('mineMapCard');
+  const head = document.getElementById('mineListHead');
+  if (card) card.hidden = true;
+  if (head) head.hidden = true;
+}
+function showTestMine() {
+  const info = loadStudentInfo();
+  const sidInp = document.getElementById('mineStudentId');
+  if (sidInp && info && info.sid) sidInp.value = info.sid;
+  document.getElementById('mineStudentRow').style.display = 'none';
+  lookupMine();
+}
+function setMineMode(mode) {
+  mineMode = mode;
+  const row = document.getElementById('mineAdminRow');
+  if (row) row.classList.toggle('mode-test', mode === 'test');
+  document.querySelectorAll('#mineModeSeg button').forEach(b => {
+    const on = b.dataset.mine === mode;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  renderAllStudentRecords();
+}
+(function hookMine() {
+  const wrap = (name, fn) => { const f = window[name]; window[name] = function () { return fn(f, this, arguments); }; };
+  wrap('lookupMine', (f, t, a) => {
+    const r = f.apply(t, a);
+    const sid = (document.getElementById('mineStudentId').value || '').trim();
+    if (sid) renderMineMap(visibleEntries().filter(([, o]) => String(o.studentId) === sid));
+    return r;
+  });
+  wrap('renderAllStudentRecords', (f, t, a) => {
+    if (adminMode && mineMode === 'test') { showTestMine(); return; }
+    hideMineMap();
+    return f.apply(t, a);
+  });
+  wrap('switchTab', (f, t, a) => {
+    if (a[0] === 'tab-mine') initMineMap();   // 원래 switchTab이 내 기록을 그리기 전에 지도가 있어야 함
+    return f.apply(t, a);
+  });
+})();
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#mineModeSeg button').forEach(b => b.addEventListener('click', () => setMineMode(b.dataset.mine)));
+  const row = document.getElementById('mineAdminRow');
+  if (row) row.classList.add('mode-test');
 });
 
 /* 반을 고르기 전 모아보기: 지도는 학교만, 기록은 없음 */
