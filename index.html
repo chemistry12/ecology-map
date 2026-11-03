@@ -453,6 +453,27 @@ textarea.inp { min-height: 112px; resize: vertical; line-height: 1.6; }
 .admin-stats-bar-fill { height: 100%; border-radius: 999px; background: var(--accent) !important; }
 .admin-stats-nums { font-size: var(--fs-meta); color: var(--muted); text-align: right; white-space: nowrap; }
 
+/* 모아보기 통계: 많이 발견된 생물 / 종류별 */
+.insight-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.insight-head h2 { font-size: 17px; font-weight: 600; }
+.insight-head .hint { font-size: var(--fs-meta); color: var(--muted); }
+.rank-list { list-style: none; display: grid; gap: 2px; }
+.rank-list li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; grid-template-rows: auto 6px; column-gap: 8px; row-gap: 4px; align-items: center; padding: 6px 0; }
+.rank { grid-row: 1 / 3; align-self: start; font-size: var(--fs-small); font-weight: 600; color: var(--muted); padding-top: 1px; }
+.rank-list li:first-child .rank { color: var(--accent); }
+.rk-name { font-size: 15px; font-weight: 500; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-name small { margin-left: 6px; font-size: 12px; color: var(--muted); font-weight: 400; }
+.rk-num { font-size: 15px; font-weight: 600; text-align: right; }
+.rk-num small, .kd-num small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 1px; }
+.rk-bar { grid-column: 2 / 4; height: 6px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.rk-bar i, .kd-bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.rank-list li:not(:first-child) .rk-bar i { background: color-mix(in srgb, var(--accent) 55%, var(--surface)); }
+.insight-sub { font-size: var(--fs-small); font-weight: 600; margin: 18px 0 6px; }
+.kind-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 0; font-size: var(--fs-small); }
+.kd-name { font-weight: 500; white-space: nowrap; }
+.kd-bar { height: 8px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.kd-num { font-weight: 600; text-align: right; white-space: nowrap; }
+
 .progress-board { margin-bottom: var(--gap); }
 .progress-board-title { font-size: 17px; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .progress-board-title span { float: none !important; font-size: var(--fs-meta) !important; color: var(--muted) !important; }
@@ -926,6 +947,7 @@ body.map-fs-active .topbar, body.map-fs-active .bottom-nav { display: none !impo
           <div class="class-scroll">
             <div class="class-side">
               <div class="panel stats-bar" id="statsBar"></div>
+              <div class="panel insight" id="insightPanel" style="display:none;margin-top:var(--gap);"></div>
               <div id="progressBoard" class="panel progress-board" style="display:none;margin-top:var(--gap);"></div>
             </div>
             <div class="list-head"><h2>기록</h2><span class="hint">최근 기록부터</span></div>
@@ -4126,6 +4148,90 @@ const WIDE_DETAIL = window.matchMedia ? matchMedia('(min-width: 1100px)') : { ma
 (function () {
   const open = window.openLightbox;
   window.openLightbox = function (src) { if (WIDE_DETAIL.matches) return; return open(src); };
+})();
+
+/* ──── 모아보기 통계: 많이 발견된 생물, 종류별 ────
+   AI 없이 규칙으로 처리. 학생들이 같은 생물을 다르게 적은 것(감/감나무, 메리골드/마리골드, 괄호 설명 등)은 묶어서 센다.
+   새 이름이 들어와도 규칙(끝말·단어)으로 종류를 정하고, 어디에도 안 맞으면 식물로 본다(기록 대부분이 식물). */
+const SPECIES_ALIAS = {
+  '마리골드': '메리골드', '프렌치메리골드': '메리골드', '만수국': '메리골드', '천수국': '메리골드', '시그렛메리골드': '메리골드',
+  '노란코스모스': '노랑코스모스', '황화코스모스': '노랑코스모스',
+  '감': '감나무', '밤': '밤나무', '모과': '모과나무', '석류': '석류나무', '석류과육': '석류나무',
+  '남천나무': '남천', '산수유': '산수유나무', '반송나무': '반송',
+  '임파티엔스': '임파첸스', '루엘리에': '루엘리아', '루엘리아심플렉스': '루엘리아',
+  '사계패랭이꽃': '사계패랭이', '세잎클로버': '토끼풀', '세입클로버': '토끼풀', '클로버': '토끼풀',
+  '쑥부쟁이꽃': '쑥부쟁이', '쑥뿌쟁이꽃': '쑥부쟁이', '수국꽃': '수국',
+  '화양목': '회양목', '둥근회양목': '회양목', '무늬둥글레': '무늬둥굴레',
+  '벚꽃나무': '벚나무', '왕벚나무': '벚나무', '석산': '꽃무릇',
+  '능소화나무': '능소화', '능송화': '능소화', '아카시아나무': '아까시나무', '아카시나무속': '아까시나무',
+  '홍단풍나무': '홍단풍', '영산혼': '영산홍', '민들레씨앗': '민들레', '서양민들레': '민들레',
+  '소나무묘목': '소나무', '소나무아기': '소나무', '어린소나무': '소나무', '나무에낀이끼': '이끼',
+  '가이즈카향나무': '카이즈카향나무', '꽁꽁나무': '꽝꽝나무', '도토리나무': '참나무'
+};
+function normSpecies(name) {
+  let s = String(name || '').replace(/\([^)]*\)/g, '').replace(/[\s?,.·…!~]+/g, '');
+  s = s.replace(/[^\p{L}\p{N}/]/gu, '');
+  return SPECIES_ALIAS[s] || s;
+}
+const KIND_ORDER = ['식물', '곤충·거미', '새', '포유류', '파충·양서류', '버섯·이끼', '기타'];
+function speciesKind(n) {
+  if (!n || /(사람|가로등|깃털|돌맹이|돌멩이|미생물)/.test(n)) return '기타';
+  if (/(나비|나방|벌레|노린재|거미|파리|잠자리|잠저리|매미|등에|유충|번데기|알집|박각시|송충이|말벌|꿀벌|사마귀|귀뚜라미|메뚜기|하늘소|딱정|반딧불)|^개미$/.test(n)) return '곤충·거미';
+  if (/(참새|박새|까치|까마귀|비둘기|직박구리|딱새|오리|황조롱이|물까치)|^제비$/.test(n)) return '새';
+  if (/(고양이|다람쥐|청설모|두더지|고슴도치|곰$)|^(개|강아지|쥐)$/.test(n)) return '포유류';
+  if (/(뱀|개구리|두꺼비|도롱뇽|도마뱀)/.test(n)) return '파충·양서류';
+  if (/(버섯|이끼|지의)/.test(n)) return '버섯·이끼';
+  return '식물';
+}
+
+function renderInsights() {
+  const box = document.getElementById('insightPanel');
+  if (!box) return;
+  const cls = currentClassView;
+  if (!cls) { box.style.display = 'none'; return; }
+  let rows = visibleEntries().map(([, o]) => o);
+  if (cls !== '__all__') rows = rows.filter(o => o.class === cls);
+  if (currentGroupFilter !== 'all') rows = rows.filter(o => o.group === currentGroupFilter);
+  if (!rows.length) { box.style.display = 'none'; return; }
+
+  const bySp = {}, byKind = {};
+  rows.forEach(o => {
+    const n = normSpecies(o.species);
+    if (!n) return;
+    bySp[n] = (bySp[n] || 0) + 1;
+    const k = speciesKind(n);
+    if (!byKind[k]) byKind[k] = { count: 0, species: new Set() };
+    byKind[k].count++; byKind[k].species.add(n);
+  });
+  const top = Object.entries(bySp).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko')).slice(0, 8);
+  const maxTop = top.length ? top[0][1] : 1;
+  const total = Object.values(byKind).reduce((s, v) => s + v.count, 0);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const scope = (cls === '__all__' ? '전체 학년' : cls) + (currentGroupFilter !== 'all' ? ' ' + currentGroupFilter : '');
+
+  box.style.display = '';
+  box.innerHTML = `
+    <div class="insight-head"><h2>많이 발견된 생물</h2><span class="hint">${esc(scope)} · 같은 이름 묶음</span></div>
+    <ol class="rank-list">
+      ${top.map(([n, c], i) => `<li>
+        <span class="rank">${i + 1}</span>
+        <span class="rk-name">${esc(n)}<small>${speciesKind(n)}</small></span>
+        <span class="rk-num">${c}<small>건</small></span>
+        <span class="rk-bar"><i style="width:${Math.max(4, Math.round(c / maxTop * 100))}%"></i></span>
+      </li>`).join('')}
+    </ol>
+    <h3 class="insight-sub">종류별</h3>
+    <div class="kind-list">
+      ${KIND_ORDER.filter(k => byKind[k]).map(k => `<div class="kind-row">
+        <span class="kd-name">${k}</span>
+        <span class="kd-bar"><i style="width:${Math.max(2, Math.round(byKind[k].count / total * 100))}%"></i></span>
+        <span class="kd-num">${byKind[k].count}<small>건</small> · ${byKind[k].species.size}<small>종</small></span>
+      </div>`).join('')}
+    </div>`;
+}
+(function () {
+  const f = window.renderClassView;
+  window.renderClassView = function () { const r = f.apply(this, arguments); renderInsights(); return r; };
 })();
 
 /* 반을 고르기 전 모아보기: 지도는 학교만, 기록은 없음 */
