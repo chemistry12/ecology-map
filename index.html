@@ -2187,7 +2187,8 @@ async function handleSubmit() {
 
     if (editModeId) {
       // ── 수정 모드 ──
-      await gasAPI('update', { id: editModeId, data });
+      const upd = await gasAPI('update', { id: editModeId, data });
+      if (upd && upd.photoUrl !== undefined) data.photo = upd.photoUrl || null;
       if (observations[editModeId]) {
         Object.assign(observations[editModeId], data);
         onData();
@@ -3576,7 +3577,8 @@ async function saveEdit() {
   const saveBtn = document.getElementById('editSave');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '저장 중…'; }
   try {
-    await gasAPI('update', { id: editingId, data: updates });
+    const upd = await gasAPI('update', { id: editingId, data: updates });
+    if (upd && upd.photoUrl !== undefined) updates.photo = upd.photoUrl || null;
     // 로컬 캐시 즉시 반영
     if (observations[editingId]) {
       Object.assign(observations[editingId], updates);
@@ -4431,6 +4433,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const row = document.getElementById('mineAdminRow');
   if (row) row.classList.add('mode-test');
 });
+
+/* 서버 통신이 아예 안 될 때 브라우저는 "Failed to fetch"만 줌 → 학생이 알아들을 말로 */
+(function () {
+  const f = window.gasAPI;
+  window.gasAPI = async function () {
+    try { return await f.apply(this, arguments); }
+    catch (e) {
+      if (e instanceof TypeError) throw new Error('인터넷이 불안정하거나 서버가 바빠요. 잠시 후 다시 눌러 주세요');
+      throw e;
+    }
+  };
+})();
 
 /* 반을 고르기 전 모아보기: 지도는 학교만, 기록은 없음 */
 function renderClassEmpty() {
