@@ -609,6 +609,9 @@ textarea.inp { min-height: 112px; resize: vertical; line-height: 1.6; }
 #editPhotoStatus { font-size: var(--fs-meta); color: var(--muted); margin-bottom: 6px; }
 #editMap { height: 240px; border-radius: var(--radius-inner); overflow: hidden; border: 1px solid var(--border); }
 .edit-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 16px; }
+#formDeleteBtn { width: 100%; margin-top: 8px; min-height: 44px; color: var(--negative); font-size: var(--fs-small); font-weight: 500; border-radius: var(--radius-control); }
+#formDeleteBtn:hover { background: var(--pill-negative-bg); }
+#formDeleteBtn[hidden] { display: none; }
 #editDeleteBtn { width: 100%; margin-top: 16px; min-height: 40px; color: var(--negative); font-size: var(--fs-small); font-weight: 500; border-radius: var(--radius-control); }
 #editDeleteBtn:hover { background: var(--pill-negative-bg); }
 
@@ -937,6 +940,7 @@ body.map-fs-active .topbar, body.map-fs-active .bottom-nav { display: none !impo
             <div id="formMap"></div>
             <div id="formError" role="alert"></div>
             <div class="submit-row"><button class="submit-btn" id="submitBtn">기록 저장하기</button></div>
+            <button type="button" id="formDeleteBtn" hidden>이 기록 삭제하기</button>
           </div>
         </div>
       </div>
@@ -4444,6 +4448,32 @@ document.addEventListener('DOMContentLoaded', () => {
       throw e;
     }
   };
+})();
+
+/* 내 기록 → 수정(기록하기 화면)에는 삭제 버튼이 없었음 → 저장 버튼 아래에 "이 기록 삭제하기".
+   수정 중일 때만 보이고, 권한 확인·확인 창은 원래 confirmDelete가 처리 */
+(function () {
+  const btn = () => document.getElementById('formDeleteBtn');
+  const openF = window.openEditInForm;
+  window.openEditInForm = function (id) {
+    const r = openF.apply(this, arguments);
+    const b = btn();
+    if (b) b.hidden = !(observations[id] && canEditRecord(observations[id]));
+    return r;
+  };
+  const resetF = window.resetForm;
+  window.resetForm = function () { const r = resetF.apply(this, arguments); const b = btn(); if (b) b.hidden = true; return r; };
+  document.addEventListener('DOMContentLoaded', () => {
+    const b = btn();
+    if (!b) return;
+    b.addEventListener('click', async () => {
+      const id = editModeId;
+      const obs = id && observations[id];
+      if (!obs) return;
+      await confirmDelete(id, obs.species);
+      if (!observations[id]) { resetForm(); switchTab('tab-mine'); }
+    });
+  });
 })();
 
 /* 반을 고르기 전 모아보기: 지도는 학교만, 기록은 없음 */
