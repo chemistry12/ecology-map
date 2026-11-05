@@ -398,6 +398,9 @@ textarea.inp { min-height: 112px; resize: vertical; line-height: 1.6; }
 /* ───── 모아보기 ───── */
 .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .filter-bar select.inp { width: auto; min-width: 160px; min-height: 40px; padding-top: 6px; padding-bottom: 6px; font-size: var(--fs-small); }
+.species-wrap:empty { display: none; }
+.filter-bar .species-sel { width: auto; min-width: 180px; max-width: 260px; min-height: 40px; padding-top: 6px; padding-bottom: 6px; font-size: var(--fs-small); }
+.fs-group-bar .species-sel { width: auto; max-width: 240px; min-height: 42px; border-radius: 999px; font-size: 16px; flex: none; margin-left: 4px; }
 .admin-tools { display: none; gap: 8px; flex-wrap: wrap; }
 .admin-active .admin-tools { display: flex; }
 .group-filter-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-bottom: var(--gap); scrollbar-width: none; }
@@ -694,9 +697,9 @@ textarea.inp { min-height: 112px; resize: vertical; line-height: 1.6; }
 
 /* 모아보기 크게 보기: 지도 위 반 이름 + 조 버튼 (수업 화면에서 보이게 크게) */
 .fs-group-bar {
-  display: none; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000;
-  align-items: center; gap: 6px; padding: 6px; max-width: calc(100% - 300px); overflow-x: auto; scrollbar-width: none;
-  background: var(--surface); border-radius: 999px; box-shadow: 0 6px 20px rgba(0, 0, 0, .16);
+  display: none; position: absolute; top: 12px; left: 0; right: 0; margin: 0 auto; width: fit-content; z-index: 1000;
+  align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 6px; max-width: calc(100% - 300px);
+  background: var(--surface); border-radius: 28px; box-shadow: 0 6px 20px rgba(0, 0, 0, .16);
 }
 body.map-fs-active .fs-group-bar { display: flex; }
 .fs-group-bar .fs-label { padding: 0 12px 0 10px; font-size: 17px; font-weight: 600; white-space: nowrap; }
@@ -961,6 +964,7 @@ body.map-fs-active .topbar, body.map-fs-active .bottom-nav { display: none !impo
         <div class="filter-bar">
           <label class="sr-only" for="classViewSel">학급</label>
           <select class="inp" id="classViewSel"></select>
+          <div id="speciesSelWrap" class="species-wrap"></div>
           <div class="admin-tools">
             <button id="lockAllClassBtn" class="tool-btn" onclick="lockAll('class')" style="display:none;">전체 잠금</button>
             <button id="unlockAllClassBtn" class="tool-btn" onclick="unlockAll('class')" style="display:none;">전체 잠금 해제</button>
@@ -4154,8 +4158,25 @@ function syncFsGroupBar() {
   }
   const title = document.querySelector('#statsBar .stats-title');
   const count = document.querySelector('#statsBar .stat-num');
-  const label = title ? title.textContent + (count ? ` · ${count.textContent}건` : '') : '';
-  bar.innerHTML = (label ? `<span class="fs-label">${label}</span>` : '') + document.getElementById('groupFilterRow').innerHTML;
+  const label = title
+    ? title.textContent + (speciesFilter ? ' · ' + speciesFilter : '') + (count ? ` · ${count.textContent}건` : '')
+    : '';
+  // 전체 학년: 조 대신 반 버튼 / 반을 보는 중: 맨 앞에 "전체 학년"으로 돌아가는 버튼 + 조 버튼
+  let chips;
+  if (currentClassView === '__all__') {
+    const classes = classesInView();
+    chips = '<button type="button" class="filter-chip active">전체</button>' +
+      classes.map(c => `<button type="button" class="filter-chip" data-cls="${c}">${c.replace('1학년 ', '')}</button>`).join('');
+  } else if (currentClassView) {
+    chips = '<button type="button" class="filter-chip" data-cls="__all__">전체 학년</button>' + document.getElementById('groupFilterRow').innerHTML;
+  } else {
+    chips = '';
+  }
+  bar.innerHTML = (label ? `<span class="fs-label">${label}</span>` : '') + chips +
+    (currentClassView ? speciesSelectHTML('fsSpeciesSel') : '');
+  bar.querySelectorAll('[data-cls]').forEach(b => b.addEventListener('click', () => selectClassView(b.dataset.cls)));
+  const fsSel = bar.querySelector('#fsSpeciesSel');
+  if (fsSel) fsSel.addEventListener('change', () => setSpeciesFilter(fsSel.value));
 }
 (function hookFsBar() {
   const wrap = (name) => {
@@ -4474,6 +4495,73 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!observations[id]) { resetForm(); switchTab('tab-mine'); }
     });
   });
+})();
+
+/* ──── 모아보기: 생물로 찾기 ────
+   생물을 고르면 지도·통계·목록이 그 생물 기록만 (지금 보는 반·조 범위 안에서). 이름은 normSpecies로 묶어서 비교.
+   renderClassView가 도는 동안에만 visibleEntries에 생물 필터를 건다(내 기록 등 다른 화면엔 영향 없음). */
+let speciesFilter = '';
+let _speciesOn = false;
+(function () {
+  const ve = window.visibleEntries;
+  window.visibleEntries = function () {
+    const r = ve.apply(this, arguments);
+    return (_speciesOn && speciesFilter) ? r.filter(([, o]) => normSpecies(o.species) === speciesFilter) : r;
+  };
+})();
+
+/* 지금 범위(반·조)의 생물 목록, 많이 나온 순 — 생물 필터는 빼고 셈 */
+function speciesOptions() {
+  const was = _speciesOn; _speciesOn = false;
+  let rows = visibleEntries().map(([, o]) => o);
+  _speciesOn = was;
+  const cls = currentClassView;
+  if (cls && cls !== '__all__') rows = rows.filter(o => o.class === cls);
+  if (currentGroupFilter !== 'all') rows = rows.filter(o => o.group === currentGroupFilter);
+  const c = {};
+  rows.forEach(o => { const n = normSpecies(o.species); if (n) c[n] = (c[n] || 0) + 1; });
+  return Object.entries(c).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'));
+}
+function speciesSelectHTML(id) {
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const opts = speciesOptions();
+  if (speciesFilter && !opts.some(([n]) => n === speciesFilter)) opts.unshift([speciesFilter, 0]);
+  return `<label class="sr-only" for="${id}">생물로 찾기</label><select class="inp species-sel" id="${id}">
+    <option value="">모든 생물</option>
+    ${opts.map(([n, k]) => `<option value="${esc(n)}"${n === speciesFilter ? ' selected' : ''}>${esc(n)} (${k})</option>`).join('')}
+  </select>`;
+}
+function classesInView() {
+  const was = _speciesOn; _speciesOn = false;
+  const list = [...new Set(visibleEntries().map(([, o]) => o.class).filter(Boolean))];
+  _speciesOn = was;
+  const num = c => { const m = String(c).match(/(\d+)반/); return m ? +m[1] : 99; };
+  return list.sort((a, b) => num(a) - num(b));
+}
+function selectClassView(v) {
+  const sel = document.getElementById('classViewSel');
+  if (!sel) return;
+  sel.value = v;
+  sel.dispatchEvent(new Event('change'));
+}
+function setSpeciesFilter(v) {
+  speciesFilter = v || '';
+  renderClassView();
+}
+function refreshSpeciesSel() {
+  const wrap = document.getElementById('speciesSelWrap');
+  if (!wrap) return;
+  if (!currentClassView) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = speciesSelectHTML('speciesSel');
+  wrap.querySelector('select').addEventListener('change', e => setSpeciesFilter(e.target.value));
+}
+(function () {
+  const f = window.renderClassView;
+  window.renderClassView = function () {
+    _speciesOn = true;
+    try { return f.apply(this, arguments); }
+    finally { _speciesOn = false; refreshSpeciesSel(); }
+  };
 })();
 
 /* 반을 고르기 전 모아보기: 지도는 학교만, 기록은 없음 */
