@@ -3153,6 +3153,8 @@ async function toggleClassClosed(cls, btn) {
   wrap('openEditInForm', guardId);
   wrap('openEditModal', guardId);
   wrap('confirmDelete', guardId);
+  // 서버(Apps Script)가 관리자 요청인지 알 수 있게 표시를 붙여 보냄 → 멈춘 반은 서버에서도 막힘
+  wrap('gasAPI', (f, t, a) => f.call(t, a[0], Object.assign({}, a[1] || {}, { admin: !!adminMode })));
   wrap('saveEdit', (f, t, a) => {
     const o = observations[editingId];
     if (o && studentBlocked(o.class)) { toast(closedMsg(o.class)); return; }
